@@ -70,8 +70,11 @@
         <div class="grid-scroll">
           <table class="grid" id="grafik-table-main"></table>
           <table class="grid" id="grafik-table-opie" style="display:none"></table>
-          <div class="kod-picker no-print" id="kod-picker"></div>
         </div>
+        <!-- kod-picker POZA .grid-scroll celowo - inaczej overflow-x:auto na kontenerze
+             przycina go w pionie (znany efekt uboczny overflow-x bez overflow-y).
+             Pozycjonowany JS-em jako position:fixed względem viewportu. -->
+        <div class="kod-picker no-print" id="kod-picker"></div>
         <div class="legend no-print">
           <span><span class="dot" style="background:var(--role-d-text)"></span>D — dniówka 12h</span>
           <span><span class="dot" style="background:var(--role-n-text)"></span>N — nocka 12h</span>

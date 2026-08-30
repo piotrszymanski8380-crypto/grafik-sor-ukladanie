@@ -179,13 +179,17 @@ table.grid td.dzien > *:last-child { margin-bottom: 0; }
 
 /* ---------- popover edycji komórki (Plan / Realizacja / Zamiana z) ---------- */
 /* Poszerzony i ułożony w siatkę 2026-08-30 (22 kody nie mieściły się czytelnie
-   we flex-wrap na 260px) - większe kafelki, stała liczba kolumn. */
-.grid-scroll { position: relative; }
+   we flex-wrap na 260px) - większe kafelki, stała liczba kolumn.
+   position:fixed (NIE absolute) - celowo poza .grid-scroll w HTML i pozycjonowany
+   względem viewportu (getBoundingClientRect w JS), bo .grid-scroll ma overflow-x:auto,
+   co w przeglądarkach automatycznie liczy overflow-y jako auto i PRZYCINA każdy
+   position:absolute dzieciak, który wystaje poniżej widocznego fragmentu tabeli -
+   stąd wcześniej znikały sekcje "Realizacja"/"Zamiana z" w dolnej części okienka. */
 .kod-picker {
-  position: absolute; display: none; flex-direction: column; gap: 10px; width: 340px;
+  position: fixed; display: none; flex-direction: column; gap: 10px; width: 340px;
   max-height: 420px; overflow-y: auto;
   background: var(--panel); border: 1px solid var(--border-strong); border-radius: var(--radius);
-  box-shadow: var(--shadow-md); padding: 12px; z-index: 20;
+  box-shadow: var(--shadow-md); padding: 12px; z-index: 100;
 }
 .kod-picker.open { display: flex; }
 .kp-sekcja { display: flex; flex-direction: column; gap: 6px; }

@@ -610,7 +610,6 @@ function onOtworzPicker(ev) {
     zamianaZId: wZapisany.zamianaZId || '',
   };
   const picker = document.getElementById('kod-picker');
-  const kontener = td.closest('.grid-scroll');
   const osoba = pracownicy.find((x) => x.id === pracownikId);
   const inniZGrupy = pracownicy.filter((x) => osoba && x.grupa === osoba.grupa && x.id !== pracownikId);
 
@@ -672,11 +671,17 @@ function onOtworzPicker(ev) {
 
   render();
 
-  let left = td.offsetLeft;
-  const maxLeft = kontener.clientWidth + kontener.scrollLeft - 344;
-  if (left > maxLeft) left = Math.max(0, maxLeft);
+  // position:fixed względem viewportu (patrz komentarz w style.css przy .kod-picker) -
+  // niezależne od przewijania siatki, więc okienko nigdy nie jest przycięte.
+  const rect = td.getBoundingClientRect();
+  const szerokosc = 340, margines = 10;
+  let left = rect.left;
+  if (left + szerokosc + margines > window.innerWidth) left = Math.max(margines, window.innerWidth - szerokosc - margines);
+  let top = rect.bottom + 4;
+  const wysokoscOkna = Math.min(420, picker.scrollHeight || 420);
+  if (top + wysokoscOkna + margines > window.innerHeight) top = Math.max(margines, rect.top - 4 - wysokoscOkna);
   picker.style.left = left + 'px';
-  picker.style.top = (td.offsetTop + td.offsetHeight + 4) + 'px';
+  picker.style.top = top + 'px';
   picker.classList.add('open');
 
   function naZewnatrz(e) {
