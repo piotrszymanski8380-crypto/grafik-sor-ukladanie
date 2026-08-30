@@ -248,7 +248,44 @@ const DOMYSLNE_PARAMETRY = {
   // grfSwietaRoku wyżej. Wygenerowane automatycznie, ale appka pozwala nadpisać
   // przez zmianę parametru (np. gdyby zakres lat trzeba było rozszerzyć).
   swieta: grfSwietaLat(2025, 2032),
+  // Reguły ręcznie wyłączone przez administratora (panel Ustawienia -> Reguły) -
+  // lista id-ków z GRF_KATALOG_REGUL niżej, np. ['W4','W13']. Domyślnie puste -
+  // wszystkie reguły aktywne. Persystencja: api/reguly.js (ustawienia-reguly.json),
+  // wczytywana i doklejana do parametrów w każdym wywołaniu blokada()/
+  // ostrzezeniaMiesiaca() w api/grafik.js - patrz grfRegulaAktywna() niżej.
+  wylaczoneReguly: [],
 };
+
+// ---------- katalog reguł (do panelu Ustawienia -> Reguły) ----------
+// Jedno źródło prawdy dla nazw/opisów reguł W1-W17 - serwer eksponuje ten katalog
+// przez GET /api/reguly, admin.js buduje z niego listę przełączników. `waga` to
+// TYPOWA dotkliwość reguły w UI - niektóre reguły (W3, W6) bywają hard/soft
+// zależnie od formy zatrudnienia / zgody opt-out, faktyczna dotkliwość per
+// przypadek i tak jest ustalana w blokada()/ostrzezeniaMiesiaca() niżej.
+const GRF_KATALOG_REGUL = [
+  { id: 'W1', waga: 'hard', opis: 'Zmiana niemożliwa w dniu zatwierdzonej nieobecności (i uwaga o Nn - nieobecności nieusprawiedliwionej).' },
+  { id: 'W2', waga: 'hard', opis: 'Maksymalnie jedna zmiana dziennie (D+N tego samego dnia tylko jako DOBA).' },
+  { id: 'W3', waga: 'hard/soft', opis: 'Odpoczynek dobowy min. 11 h (po nocce, po dobie) - hard dla etatu, soft dla pozostałych form.' },
+  { id: 'W4', waga: 'soft', opis: 'Odpoczynek tygodniowy min. 35 h nieprzerwanie (etat).' },
+  { id: 'W5', waga: 'soft', opis: 'Norma czasu pracy 2-miesięcznego okresu rozliczeniowego (etat).' },
+  { id: 'W6', waga: 'hard/soft', opis: 'Limit 48 h/tydzień - hard bez zgody opt-out, soft ze zgodą.' },
+  { id: 'W7', waga: 'hard', opis: 'Zasady dyżurów DOBA (odpoczynek po dobie, tylko kontrakt/zlecenie, tylko jeśli oddział je stosuje).' },
+  { id: 'W8', waga: 'hard', opis: 'Minimalna obsada dzienna (main/opie, D/N).' },
+  { id: 'W9', waga: 'soft', opis: 'Roczny limit urlopu na żądanie (Nz) - etat.' },
+  { id: 'W10', waga: 'soft', opis: 'Limit nocek z rzędu i zmian z rzędu bez dnia wolnego.' },
+  { id: 'W11', waga: 'soft', opis: 'Pula urlopu wypoczynkowego (jeśli ustawiona dla pracownika).' },
+  { id: 'W12', waga: 'hard', opis: 'Przeciwwskazania indywidualne (flaga „bez nocek").' },
+  { id: 'W13', waga: 'soft', opis: 'Minimum 1 starszy asystent pielęgniarstwa na dyżurze D/N.' },
+  { id: 'W14', waga: 'hard', opis: 'Minimalna liczba pielęgniarek (nie ratowników) w obsadzie main.' },
+  { id: 'W15', waga: 'soft', opis: 'Zakres godzin min/max miesięcznie dla zlecenia/kontraktu.' },
+  { id: 'W16', waga: 'soft', opis: 'Roczne limity siły wyższej (SW) i opieki nad dzieckiem (Op).' },
+  { id: 'W17', waga: 'soft', opis: 'Pilnowanie odbioru dnia wolnego za pracę w niedzielę/święto/sobotę (Wn/Ws).' },
+];
+
+/** Czy dana reguła jest aktywna (brak jej na liście parametry.wylaczoneReguly). */
+function grfRegulaAktywna(parametry, id) {
+  return !(parametry && parametry.wylaczoneReguly && parametry.wylaczoneReguly.indexOf(id) !== -1);
+}
 
 // ---------- pomocnicze: kalendarz ----------
 function grfDataDoObiektu(data) {
@@ -360,12 +397,12 @@ function blokada(pracownik, data, kod, wpisy, parametry) {
   var jutro = grfGlownyKod(indeks, pracownik.id, dodajDni(data, 1));
 
   // W1 - zmiana niemożliwa w dniu zatwierdzonej nieobecności
-  if (grfJestNieobecnoscia(dzisiaj) && !grfJestNieobecnoscia(kod)) {
+  if (grfRegulaAktywna(parametry, 'W1') && grfJestNieobecnoscia(dzisiaj) && !grfJestNieobecnoscia(kod)) {
     return 'W1 - w tym dniu jest zatwierdzona nieobecność (' + dzisiaj + '). Najpierw ją zdejmij.';
   }
 
   // W2 - max jedna zmiana dziennie (D+N tego samego dnia tylko jako DOBA)
-  if (grfJestZmiana(kod)) {
+  if (grfRegulaAktywna(parametry, 'W2') && grfJestZmiana(kod)) {
     var inneZmianyDzis = grfKodyDnia(indeks, pracownik.id, data).filter(grfJestZmiana);
     var wszystkieTakieSame = true;
     for (var i = 0; i < inneZmianyDzis.length; i++) {
@@ -380,24 +417,24 @@ function blokada(pracownik, data, kod, wpisy, parametry) {
   // przed N nie może już stać D następnego dnia). Twarda dla etatu, w innym wypadku
   // sygnalizowana jako miękka w ostrzezeniaMiesiaca().
   if (pracownik.forma === 'etat') {
-    if ((kod === 'D' || kod === 'DOBA') && wczoraj === 'N') {
+    if (grfRegulaAktywna(parametry, 'W3') && (kod === 'D' || kod === 'DOBA') && wczoraj === 'N') {
       return 'W3 - po nocce (kończy się 07:00) odpoczynek 11 h; najwcześniej dniówka o 19:00 (art. 97 UoDL).';
     }
-    if (kod === 'N' && jutro === 'D') {
+    if (grfRegulaAktywna(parametry, 'W3') && kod === 'N' && jutro === 'D') {
       return 'W3 - nazajutrz zaplanowana dniówka; odpoczynek 11 h nie zostanie zachowany (art. 97 UoDL).';
     }
     // W7 - po DOBIE (24 h) odpoczynek: bezpośrednio po niej nie D/DOBA (analogicznie do W3)
-    if ((kod === 'D' || kod === 'DOBA') && wczoraj === 'DOBA') {
+    if (grfRegulaAktywna(parametry, 'W7') && (kod === 'D' || kod === 'DOBA') && wczoraj === 'DOBA') {
       return 'W7 - po dyżurze DOBA wymagany odpoczynek co najmniej równy przepracowanym godzinom (art. 95/97 UoDL).';
     }
-    if (kod === 'DOBA' && jutro === 'DOBA') {
+    if (grfRegulaAktywna(parametry, 'W7') && kod === 'DOBA' && jutro === 'DOBA') {
       return 'W7 - dwie doby z rzędu bez odpoczynku między nimi (art. 95/97 UoDL).';
     }
   }
 
   // W6 - praca ponad 48 h/tydz. w okresie rozliczeniowym bez odnotowanej zgody opt-out
   // jest TWARDA (bez zgody). Ze zgodą - sprawdzane jako miękkie w ostrzezeniaMiesiaca().
-  if (pracownik.forma === 'etat' && grfJestZmiana(kod) && !pracownik.optOutZgoda) {
+  if (grfRegulaAktywna(parametry, 'W6') && pracownik.forma === 'etat' && grfJestZmiana(kod) && !pracownik.optOutZgoda) {
     var tydz = grfTydzienRozliczeniowy(data);
     var godzinyTygodnia = grfSumaGodzinTygodnia(indeks, pracownik.id, tydz, data, kod, grfWymiarEtatu(pracownik));
     if (godzinyTygodnia > parametry.limit48hTygodniowo) {
@@ -406,18 +443,18 @@ function blokada(pracownik, data, kod, wpisy, parametry) {
   }
 
   // W7 - DOBA dozwolona tylko jeśli oddział ją stosuje
-  if (kod === 'DOBA' && !parametry.stosujeDobe) {
+  if (grfRegulaAktywna(parametry, 'W7') && kod === 'DOBA' && !parametry.stosujeDobe) {
     return 'W7 - oddział nie stosuje dyżurów DOBA (parametr oddziału).';
   }
 
   // W7 - DOBA (24h) tylko dla kontraktu/zlecenia - POTWIERDZONE przez Piotra
   // 2026-08-13: personel etatowy nie może brać dyżurów 24h, kontrakt/zlecenie może.
-  if (kod === 'DOBA' && pracownik.forma === 'etat') {
+  if (grfRegulaAktywna(parametry, 'W7') && kod === 'DOBA' && pracownik.forma === 'etat') {
     return 'W7 - dyżury DOBA (24h) dostępne tylko dla kontraktu/zlecenia, nie dla etatu.';
   }
 
   // W12 - przeciwwskazania indywidualne (np. brak nocek, ciąża - zakaz pracy w nocy)
-  if ((kod === 'N' || kod === 'DOBA') && pracownik.flagi && pracownik.flagi.indexOf('bez_nocek') !== -1) {
+  if (grfRegulaAktywna(parametry, 'W12') && (kod === 'N' || kod === 'DOBA') && pracownik.flagi && pracownik.flagi.indexOf('bez_nocek') !== -1) {
     return 'W12 - pracownik ma flagę „bez nocek" (orzeczenie/ciąża, art. 178 KP).';
   }
 
@@ -888,7 +925,13 @@ function ostrzezeniaMiesiaca(wpisy, pracownicy, rok, miesiac, parametry, wpisyRo
     });
   }
 
-  return out.sort(function (a, b) { return (a.sev === b.sev ? 0 : a.sev === 'hard' ? -1 : 1); });
+  // Filtr reguł ręcznie wyłączonych w Ustawieniach (parametry.wylaczoneReguly) -
+  // JEDNO miejsce dla wszystkich reguł tej funkcji (W1/Nn, W3-W6, W8-W11, W13-W17),
+  // zamiast owijania każdego pojedynczego push() wyżej w warunek - patrz
+  // grfRegulaAktywna().
+  return out
+    .filter(function (o) { return grfRegulaAktywna(parametry, o.rule); })
+    .sort(function (a, b) { return (a.sev === b.sev ? 0 : a.sev === 'hard' ? -1 : 1); });
 }
 
 function grfHm(h) {
@@ -1008,6 +1051,8 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     GRF_GODZ_KOD: GRF_GODZ_KOD,
     DOMYSLNE_PARAMETRY: DOMYSLNE_PARAMETRY,
+    GRF_KATALOG_REGUL: GRF_KATALOG_REGUL,
+    grfRegulaAktywna: grfRegulaAktywna,
     godzinyKodu: godzinyKodu,
     grfKodEfektywny: grfKodEfektywny,
     jestSwietem: jestSwietem,
