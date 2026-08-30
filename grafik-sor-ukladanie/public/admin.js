@@ -260,85 +260,112 @@ function opcjeStanowiska(grupa, wybrane) {
     lista.map(([v, etykieta]) => '<option value="' + v + '"' + (wybrane === v ? ' selected' : '') + '>' + etykieta + '</option>').join('');
 }
 
-// Kolumny SAP/Bez nocek/Opt-out 48h dotyczą tylko grupy main - w tabeli opie ich
-// nie ma. Za to tylko opie ma kolumny "Typ dyżuru" (dzień/noc/tylko dzień/doba).
+// inicjaly(imieNazwisko) - do awatara w kafelku kadry: 1-2 litery (pierwsza
+// litera pierwszego i drugiego "słowa" imienia/nazwiska, albo tylko pierwsza,
+// jeśli podano jedno słowo/nic jeszcze nie wpisano).
+function inicjaly(imieNazwisko) {
+  const czesci = String(imieNazwisko || '').trim().split(/\s+/).filter(Boolean);
+  if (!czesci.length) return '?';
+  if (czesci.length === 1) return czesci[0][0].toUpperCase();
+  return (czesci[0][0] + czesci[1][0]).toUpperCase();
+}
+
+// wierszPracownika(p, pokazPolaMain) -> kafelek (karta) pracownika, na życzenie
+// 2026-08-30 ("aby każdy pracownik był w formie kafelka") zamiast wiersza tabeli -
+// KLASY CSS pól (p-nazwa, p-forma, ...) zostały BEZ ZMIAN względem poprzedniej
+// wersji tabelarycznej, więc reszta appki (zapis/wgrywanie z pliku) działa
+// identycznie, zmienił się tylko układ HTML/wizualny. Pola SAP/Bez nocek/Opt-out
+// dotyczą tylko main, "Typ dyżuru" tylko opie - "Zgoda: mniej nocek" (W18) jest
+// wspólna dla obu grup.
 function wierszPracownika(p, pokazPolaMain) {
   p = p || { id: '', imieNazwisko: '', forma: 'etat', etat: 1, grupa: 'main', stanowisko: '', flagi: [], optOutZgoda: false, typyDyzuru: [] };
   if (pokazPolaMain == null) pokazPolaMain = p.grupa !== 'opie';
   const flagi = p.flagi || [];
   const typyDyzuru = p.typyDyzuru || [];
-  const tr = document.createElement('tr');
-  tr.innerHTML =
-    '<td><input type="text" class="p-nazwa" value="' + (p.imieNazwisko || '').replace(/"/g, '&quot;') + '" placeholder="Imię i nazwisko" style="width:160px"></td>' +
-    '<td><select class="p-forma"><option value="etat"' + (p.forma === 'etat' ? ' selected' : '') + '>etat</option>' +
-      '<option value="kontrakt"' + (p.forma === 'kontrakt' ? ' selected' : '') + '>kontrakt</option>' +
-      '<option value="zlecenie"' + (p.forma === 'zlecenie' ? ' selected' : '') + '>zlecenie</option></select></td>' +
-    '<td><input type="number" class="p-etat" value="' + (p.etat == null ? 1 : p.etat) + '" min="0" max="1" step="0.05" style="width:60px"></td>' +
-    '<td><select class="p-grupa"><option value="main"' + (p.grupa === 'main' ? ' selected' : '') + '>main</option>' +
-      '<option value="opie"' + (p.grupa === 'opie' ? ' selected' : '') + '>opie</option></select></td>' +
-    '<td><select class="p-stanowisko">' + opcjeStanowiska(p.grupa, p.stanowisko) + '</select></td>' +
-    '<td><input type="number" class="p-godz-min" value="' + (p.zlecenieMinGodzin == null ? '' : p.zlecenieMinGodzin) + '" min="0" step="1" style="width:70px" placeholder="—"' + (p.forma === 'etat' ? ' disabled' : '') + '></td>' +
-    '<td><input type="number" class="p-godz-max" value="' + (p.zlecenieMaxGodzin == null ? '' : p.zlecenieMaxGodzin) + '" min="0" step="1" style="width:70px" placeholder="—"' + (p.forma === 'etat' ? ' disabled' : '') + '></td>' +
-    // SW/Op - jednostka rocznego limitu (2 dni LUB 16 godz.) - dotyczy tylko etatu
-    // (wytyczne_grafik_oddzialowa.docx pkt 3: "Wytyczne obejmują personel etatowy").
-    '<td><select class="p-sw-jednostka" title="Jednostka rocznego limitu siły wyższej (SW)"' + (p.forma !== 'etat' ? ' disabled' : '') + '>' +
-      '<option value="dni"' + (p.silaWyzszaJednostka !== 'godziny' ? ' selected' : '') + '>SW: dni</option>' +
-      '<option value="godziny"' + (p.silaWyzszaJednostka === 'godziny' ? ' selected' : '') + '>SW: godz.</option></select></td>' +
-    '<td><select class="p-op-jednostka" title="Jednostka rocznego limitu opieki nad dzieckiem (Op)"' + (p.forma !== 'etat' ? ' disabled' : '') + '>' +
-      '<option value="dni"' + (p.opiekaJednostka !== 'godziny' ? ' selected' : '') + '>Op: dni</option>' +
-      '<option value="godziny"' + (p.opiekaJednostka === 'godziny' ? ' selected' : '') + '>Op: godz.</option></select></td>' +
-    // Zgoda na mniejszą liczbę dyżurów/nocek niż reszta zespołu - wyklucza osobę
-    // z reguły W18 (sprawiedliwy rozkład dyżurów, patrz domain/grafik.js), tak jak
-    // "bez_nocek"/"tylko_dzien" - wspólna kolumna dla obu grup (dopisane 2026-08-30).
-    '<td style="text-align:center"><input type="checkbox" class="p-mniej-nocek" title="Wyklucza z reguły W18 (sprawiedliwy rozkład dyżurów)"' + (flagi.indexOf('zgoda_mniej_nocek') !== -1 ? ' checked' : '') + '></td>' +
-    (pokazPolaMain
-      ? '<td style="text-align:center"><input type="checkbox" class="p-sap"' + (flagi.indexOf('starszy_asystent') !== -1 ? ' checked' : '') + '></td>' +
-        '<td style="text-align:center"><input type="checkbox" class="p-beznocek"' + (flagi.indexOf('bez_nocek') !== -1 ? ' checked' : '') + '></td>' +
-        '<td style="text-align:center"><input type="checkbox" class="p-optout"' + (p.optOutZgoda ? ' checked' : '') + '></td>'
-      : '<td style="text-align:center"><input type="checkbox" class="p-dyzur-dzien"' + (typyDyzuru.indexOf('dzien') !== -1 ? ' checked' : '') + '></td>' +
-        '<td style="text-align:center"><input type="checkbox" class="p-dyzur-noc"' + (typyDyzuru.indexOf('noc') !== -1 ? ' checked' : '') + '></td>' +
-        '<td style="text-align:center"><input type="checkbox" class="p-dyzur-tylko-dzien"' + (typyDyzuru.indexOf('tylko_dzien') !== -1 ? ' checked' : '') + '></td>' +
-        '<td style="text-align:center"><input type="checkbox" class="p-dyzur-doba"' + (typyDyzuru.indexOf('doba') !== -1 ? ' checked' : '') + '></td>') +
-    '<td><button type="button" class="icon-btn btn-usun-p" title="Usuń"><i class="ti ti-trash"></i></button></td>';
-  tr.dataset.id = p.id || '';
-  tr.querySelector('.btn-usun-p').addEventListener('click', () => tr.remove());
-  tr.querySelector('.p-grupa').addEventListener('change', (ev) => {
-    tr.querySelector('.p-stanowisko').innerHTML = opcjeStanowiska(ev.target.value, '');
+  const karta = document.createElement('div');
+  karta.className = 'pracownik-kafelek';
+  karta.innerHTML =
+    '<div class="pk-glowka">' +
+      '<div class="pk-avatar">' + inicjaly(p.imieNazwisko) + '</div>' +
+      '<input type="text" class="p-nazwa pk-nazwa" value="' + (p.imieNazwisko || '').replace(/"/g, '&quot;') + '" placeholder="Imię i nazwisko">' +
+      '<button type="button" class="icon-btn btn-usun-p" title="Usuń"><i class="ti ti-trash"></i></button>' +
+    '</div>' +
+    '<div class="pk-pola">' +
+      '<label>Forma<select class="p-forma"><option value="etat"' + (p.forma === 'etat' ? ' selected' : '') + '>etat</option>' +
+        '<option value="kontrakt"' + (p.forma === 'kontrakt' ? ' selected' : '') + '>kontrakt</option>' +
+        '<option value="zlecenie"' + (p.forma === 'zlecenie' ? ' selected' : '') + '>zlecenie</option></select></label>' +
+      '<label>Etat<input type="number" class="p-etat" value="' + (p.etat == null ? 1 : p.etat) + '" min="0" max="1" step="0.05"></label>' +
+      '<label>Grupa<select class="p-grupa"><option value="main"' + (p.grupa === 'main' ? ' selected' : '') + '>main</option>' +
+        '<option value="opie"' + (p.grupa === 'opie' ? ' selected' : '') + '>opie</option></select></label>' +
+      '<label>Stanowisko<select class="p-stanowisko">' + opcjeStanowiska(p.grupa, p.stanowisko) + '</select></label>' +
+      '<label>Godz. min<input type="number" class="p-godz-min" value="' + (p.zlecenieMinGodzin == null ? '' : p.zlecenieMinGodzin) + '" min="0" step="1" placeholder="—"' + (p.forma === 'etat' ? ' disabled' : '') + '></label>' +
+      '<label>Godz. max<input type="number" class="p-godz-max" value="' + (p.zlecenieMaxGodzin == null ? '' : p.zlecenieMaxGodzin) + '" min="0" step="1" placeholder="—"' + (p.forma === 'etat' ? ' disabled' : '') + '></label>' +
+      // SW/Op - jednostka rocznego limitu (2 dni LUB 16 godz.) - dotyczy tylko etatu
+      // (wytyczne_grafik_oddzialowa.docx pkt 3: "Wytyczne obejmują personel etatowy").
+      '<label>SW limit<select class="p-sw-jednostka" title="Jednostka rocznego limitu siły wyższej (SW)"' + (p.forma !== 'etat' ? ' disabled' : '') + '>' +
+        '<option value="dni"' + (p.silaWyzszaJednostka !== 'godziny' ? ' selected' : '') + '>dni</option>' +
+        '<option value="godziny"' + (p.silaWyzszaJednostka === 'godziny' ? ' selected' : '') + '>godz.</option></select></label>' +
+      '<label>Op limit<select class="p-op-jednostka" title="Jednostka rocznego limitu opieki nad dzieckiem (Op)"' + (p.forma !== 'etat' ? ' disabled' : '') + '>' +
+        '<option value="dni"' + (p.opiekaJednostka !== 'godziny' ? ' selected' : '') + '>dni</option>' +
+        '<option value="godziny"' + (p.opiekaJednostka === 'godziny' ? ' selected' : '') + '>godz.</option></select></label>' +
+    '</div>' +
+    '<div class="pk-flagi">' +
+      // Zgoda na mniejszą liczbę dyżurów/nocek niż reszta zespołu - wyklucza osobę
+      // z reguły W18 (sprawiedliwy rozkład dyżurów, patrz domain/grafik.js), tak jak
+      // "bez_nocek"/"tylko_dzien" - wspólna dla obu grup (dopisane 2026-08-30).
+      '<label class="pk-flaga" title="Wyklucza z reguły W18 (sprawiedliwy rozkład dyżurów)"><input type="checkbox" class="p-mniej-nocek"' + (flagi.indexOf('zgoda_mniej_nocek') !== -1 ? ' checked' : '') + '> Zgoda: mniej nocek</label>' +
+      (pokazPolaMain
+        ? '<label class="pk-flaga"><input type="checkbox" class="p-sap"' + (flagi.indexOf('starszy_asystent') !== -1 ? ' checked' : '') + '> SAP 🩺</label>' +
+          '<label class="pk-flaga"><input type="checkbox" class="p-beznocek"' + (flagi.indexOf('bez_nocek') !== -1 ? ' checked' : '') + '> Bez nocek</label>' +
+          '<label class="pk-flaga"><input type="checkbox" class="p-optout"' + (p.optOutZgoda ? ' checked' : '') + '> Opt-out 48h</label>'
+        : '<label class="pk-flaga"><input type="checkbox" class="p-dyzur-dzien"' + (typyDyzuru.indexOf('dzien') !== -1 ? ' checked' : '') + '> Dzień</label>' +
+          '<label class="pk-flaga"><input type="checkbox" class="p-dyzur-noc"' + (typyDyzuru.indexOf('noc') !== -1 ? ' checked' : '') + '> Noc</label>' +
+          '<label class="pk-flaga"><input type="checkbox" class="p-dyzur-tylko-dzien"' + (typyDyzuru.indexOf('tylko_dzien') !== -1 ? ' checked' : '') + '> Tylko dzień</label>' +
+          '<label class="pk-flaga"><input type="checkbox" class="p-dyzur-doba"' + (typyDyzuru.indexOf('doba') !== -1 ? ' checked' : '') + '> Doba</label>') +
+    '</div>';
+  karta.dataset.id = p.id || '';
+  karta.querySelector('.btn-usun-p').addEventListener('click', () => karta.remove());
+  karta.querySelector('.p-nazwa').addEventListener('input', (ev) => {
+    karta.querySelector('.pk-avatar').textContent = inicjaly(ev.target.value);
   });
-  tr.querySelector('.p-forma').addEventListener('change', (ev) => {
+  karta.querySelector('.p-grupa').addEventListener('change', (ev) => {
+    karta.querySelector('.p-stanowisko').innerHTML = opcjeStanowiska(ev.target.value, '');
+  });
+  karta.querySelector('.p-forma').addEventListener('change', (ev) => {
     const jestEtat = ev.target.value === 'etat';
-    const polMin = tr.querySelector('.p-godz-min');
-    const polMax = tr.querySelector('.p-godz-max');
+    const polMin = karta.querySelector('.p-godz-min');
+    const polMax = karta.querySelector('.p-godz-max');
     polMin.disabled = jestEtat;
     polMax.disabled = jestEtat;
     if (jestEtat) { polMin.value = ''; polMax.value = ''; }
-    tr.querySelector('.p-sw-jednostka').disabled = !jestEtat;
-    tr.querySelector('.p-op-jednostka').disabled = !jestEtat;
+    karta.querySelector('.p-sw-jednostka').disabled = !jestEtat;
+    karta.querySelector('.p-op-jednostka').disabled = !jestEtat;
   });
-  return tr;
+  return karta;
 }
 
 function renderTabelePracownikow() {
-  const tbodyMain = document.getElementById('tabela-pracownicy-main-body');
-  const tbodyOpie = document.getElementById('tabela-pracownicy-opie-body');
-  tbodyMain.innerHTML = '';
-  tbodyOpie.innerHTML = '';
+  const siatkaMain = document.getElementById('tabela-pracownicy-main');
+  const siatkaOpie = document.getElementById('tabela-pracownicy-opie');
+  siatkaMain.innerHTML = '';
+  siatkaOpie.innerHTML = '';
   pracownicy.forEach((p) => {
     const jestOpie = p.grupa === 'opie';
-    const tr = wierszPracownika(p, !jestOpie);
-    (jestOpie ? tbodyOpie : tbodyMain).appendChild(tr);
+    const karta = wierszPracownika(p, !jestOpie);
+    (jestOpie ? siatkaOpie : siatkaMain).appendChild(karta);
   });
 }
 
 document.getElementById('btn-dodaj-pracownika').addEventListener('click', () => {
-  const tbody = document.getElementById(aktywnaGrupa === 'opie' ? 'tabela-pracownicy-opie-body' : 'tabela-pracownicy-main-body');
+  const siatka = document.getElementById(aktywnaGrupa === 'opie' ? 'tabela-pracownicy-opie' : 'tabela-pracownicy-main');
   const nowyId = 'p' + (Date.now().toString(36));
-  const tr = wierszPracownika({ id: nowyId, forma: 'etat', etat: 1, grupa: aktywnaGrupa }, aktywnaGrupa !== 'opie');
-  tbody.appendChild(tr);
+  const karta = wierszPracownika({ id: nowyId, forma: 'etat', etat: 1, grupa: aktywnaGrupa }, aktywnaGrupa !== 'opie');
+  siatka.appendChild(karta);
+  karta.querySelector('.p-nazwa').focus();
 });
 
 document.getElementById('btn-zapisz-pracownikow').addEventListener('click', async () => {
-  const wiersze = Array.from(document.querySelectorAll('#tabela-pracownicy-main-body tr, #tabela-pracownicy-opie-body tr'));
+  const wiersze = Array.from(document.querySelectorAll('#tabela-pracownicy-main .pracownik-kafelek, #tabela-pracownicy-opie .pracownik-kafelek'));
   const nowaLista = wiersze.map((tr, i) => {
     const flagi = [];
     const polSap = tr.querySelector('.p-sap');

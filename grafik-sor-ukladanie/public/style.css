@@ -224,11 +224,45 @@ table.grid td.dzien.drag-over { outline: 2px dashed var(--accent); outline-offse
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 10px; }
 .legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
 
-/* ---------- tabela pracowników ---------- */
+/* ---------- tabela pracowników (starsza wersja, zostawiona na wypadek odwrotu) ---------- */
 table.staff { border-collapse: collapse; width: 100%; font-size: 12.5px; }
 table.staff th, table.staff td { padding: 7px 8px; border-bottom: 1px solid var(--border); text-align: left; }
 table.staff thead th { color: var(--muted); font-weight: 500; background: var(--bg); }
 table.staff td input, table.staff td select { width: 100%; }
+
+/* ---------- kadra jako kafelki (2026-08-30, "aby każdy pracownik był w formie
+   kafelka") - siatka kart zamiast wierszy tabeli; pola i klasy CSS wewnątrz są
+   te same co poprzednio (p-nazwa, p-forma, ...), zmienił się tylko układ. ---------- */
+.kafelki-siatka {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px; align-items: start;
+}
+.pracownik-kafelek {
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: 14px; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow);
+}
+.pk-glowka { display: flex; align-items: center; gap: 10px; }
+.pk-avatar {
+  width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;
+  flex-shrink: 0;
+}
+.pk-nazwa {
+  flex: 1; min-width: 0; border: none; background: none; font-size: 14.5px; font-weight: 600;
+  padding: 4px 2px; border-radius: 6px;
+}
+.pk-nazwa:focus { outline: 2px solid var(--accent-bg); background: var(--bg); }
+.pk-pola { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 10px; }
+.pk-pola label {
+  display: flex; flex-direction: column; gap: 3px; font-size: 10.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.02em; color: var(--muted);
+}
+.pk-pola input, .pk-pola select { width: 100%; font-size: 13px; padding: 6px 8px; }
+.pk-flagi { display: flex; flex-wrap: wrap; gap: 8px 14px; padding-top: 10px; border-top: 1px solid var(--border); }
+.pk-flaga {
+  display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text);
+  font-weight: 500; cursor: pointer;
+}
 
 /* ---------- lista ostrzeżeń ---------- */
 ul.warn-list { list-style: none; margin: 0; padding: 0; }

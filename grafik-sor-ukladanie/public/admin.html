@@ -108,7 +108,7 @@
         pacjenta (podgrupa, dziś tylko zapisywana, w przyszłości może wpływać na układanie grafiku). Pola
         SAP/Bez nocek/Opt-out 48h dotyczą tylko main. Pola „Godz. min/max" dotyczą osób na zlecenie/kontrakt
         — appka ostrzeże (reguła W15), jeśli suma godzin w danym miesiącu wypadnie poza ten zakres (dla etatu
-        pola te są nieaktywne). Kolumny „Dzień/Noc/Tylko dzień/Doba" dotyczą tylko opie — uprawnienia do
+        pola te są nieaktywne). Pola „Dzień/Noc/Tylko dzień/Doba" dotyczą tylko opie — uprawnienia do
         rodzaju dyżuru (można zaznaczyć kilka naraz), dziś tylko zapisywane.</p>
         <p class="note">Możesz wgrać listę z pliku Excel/CSV — rozpoznawane kolumny (nazwy elastyczne,
         wielkość liter bez znaczenia, obsługiwany też dwuwierszowy nagłówek grupa+podgrupa): <b>Imię i
@@ -118,26 +118,13 @@
         dzień</b>, <b>Doba</b> (tylko opie). Osoby o tym samym imieniu i nazwisku zostaną zaktualizowane,
         nowe — dodane. Po wgraniu sprawdź listę i kliknij „Zapisz listę".</p>
 
-        <div class="grid-scroll">
-          <table class="staff" id="tabela-pracownicy-main">
-            <thead><tr>
-              <th>Imię i nazwisko</th><th>Forma</th><th>Etat</th><th>Grupa</th>
-              <th>Stanowisko</th><th>Godz. min</th><th>Godz. max</th>
-              <th>SW limit</th><th>Op limit</th><th>Zgoda: mniej nocek</th>
-              <th>SAP 🩺</th><th>Bez nocek</th><th>Opt-out 48h</th><th></th>
-            </tr></thead>
-            <tbody id="tabela-pracownicy-main-body"></tbody>
-          </table>
-          <table class="staff" id="tabela-pracownicy-opie" style="display:none">
-            <thead><tr>
-              <th>Imię i nazwisko</th><th>Forma</th><th>Etat</th><th>Grupa</th>
-              <th>Stanowisko</th><th>Godz. min</th><th>Godz. max</th>
-              <th>SW limit</th><th>Op limit</th><th>Zgoda: mniej nocek</th>
-              <th>Dzień</th><th>Noc</th><th>Tylko dzień</th><th>Doba</th><th></th>
-            </tr></thead>
-            <tbody id="tabela-pracownicy-opie-body"></tbody>
-          </table>
-        </div>
+        <!-- Kadra jako kafelki (2026-08-30, na życzenie: "aby każdy pracownik był w
+             formie kafelka") - każda karta to samodzielny mini-formularz, budowana w
+             wierszPracownika() w admin.js (nazwa funkcji/klasy pól CSS zostały bez
+             zmian z poprzedniej wersji tabelarycznej - zmienił się tylko układ HTML,
+             logika zbierania/zapisu/wgrywania z pliku jest identyczna). -->
+        <div class="kafelki-siatka" id="tabela-pracownicy-main"></div>
+        <div class="kafelki-siatka" id="tabela-pracownicy-opie" style="display:none"></div>
         <div class="row no-print" style="margin-top:12px">
           <button class="btn secondary sm" id="btn-dodaj-pracownika"><i class="ti ti-plus"></i> Dodaj pracownika</button>
           <button class="btn secondary sm" id="btn-wgraj-plik"><i class="ti ti-file"></i> Wgraj z pliku (Excel/CSV)</button>
