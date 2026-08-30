@@ -144,7 +144,11 @@ async function pokazGrafik() {
   const tresc = document.getElementById('tresc');
   tresc.innerHTML = '<p class="note">Wczytywanie…</p>';
 
-  const res = await fetch('/api/grafik?rok=' + rok + '&miesiac=' + miesiac, { credentials: 'same-origin' });
+  // widok=podglad - patrz komentarz w api/grafik.js (2026-08-30): wymusza
+  // publiczną gałąź odpowiedzi (pole opublikowany), nawet gdy w tej samej
+  // przeglądarce jest aktywna sesja admina (np. wejście z panelu admina
+  // przełącznikiem "Podgląd (personel)").
+  const res = await fetch('/api/grafik?rok=' + rok + '&miesiac=' + miesiac + '&widok=podglad', { credentials: 'same-origin' });
 
   if (res.status === 401) {
     ostatnieDane = null;
