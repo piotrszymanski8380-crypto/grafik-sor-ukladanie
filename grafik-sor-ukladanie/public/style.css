@@ -121,43 +121,51 @@ label { font-size: 13px; color: var(--muted); display: flex; align-items: center
 .segmented button.active { background: var(--panel); color: var(--text); box-shadow: var(--shadow); font-weight: 600; }
 
 /* ---------- siatka grafiku ---------- */
-/* Rozmiary powiększone 2026-08-30 (feedback: siatka za mała, nie widać stosu
-   plan/realizacja przy wpisywaniu) - większe komórki, większe czcionki. */
+/* Przeprojektowane 2026-08-30 (feedback: "powinna być możliwość widać cały mc
+   na ekranie, powinno być plan realizacja u każdego pracownika") - dwa STAŁE
+   wiersze na osobę (plan / realizacja, patrz renderTabeleGrafiku w admin.js) +
+   table-layout:fixed z colgroup, żeby kolumny dni dzieliły się równo na całą
+   szerokość karty i cały miesiąc (do 31 dni) mieścił się bez przewijania w
+   poziomie na typowym ekranie. min-width na tabeli to tylko dolna granica
+   czytelności - poniżej niej .grid-scroll i tak przewinie w poziomie. */
 .grid-scroll { overflow-x: auto; }
-table.grid { border-collapse: collapse; width: 100%; font-size: 14px; }
+table.grid { border-collapse: collapse; table-layout: fixed; width: 100%; min-width: 780px; font-size: 12px; }
+col.col-nazwa { width: 132px; }
 table.grid th, table.grid td { padding: 0; text-align: center; border-bottom: 1px solid var(--border); }
 table.grid thead th {
-  padding: 11px 8px; font-weight: 600; color: var(--muted); background: var(--panel);
-  position: sticky; top: 0; z-index: 2; white-space: nowrap; font-size: 13px;
+  padding: 7px 2px; font-weight: 600; color: var(--muted); background: var(--panel);
+  position: sticky; top: 0; z-index: 2; font-size: 11px;
 }
 table.grid thead th.weekend { background: var(--soft-bg); color: var(--soft); }
 table.grid td.nazwa, table.grid th.nazwa {
   position: sticky; left: 0; background: var(--panel); z-index: 3; text-align: left;
-  padding: 10px 14px; white-space: nowrap; font-weight: 600; border-right: 1px solid var(--border);
+  padding: 6px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-weight: 600; font-size: 12.5px; border-right: 1px solid var(--border);
 }
 table.grid tbody tr:hover td { background: var(--bg); }
 table.grid tbody tr:hover td.nazwa { background: var(--bg); }
 table.grid td.dzien {
-  padding: 6px 4px; cursor: pointer; min-width: 68px; height: 52px;
+  padding: 3px 2px; cursor: pointer; position: relative;
   display: table-cell; vertical-align: middle;
 }
+table.grid tr.wiersz-plan td.dzien { height: 30px; border-bottom: none; }
+table.grid tr.wiersz-realizacja td.dzien { height: 22px; background: #fbfbfc; }
+table.grid tr.wiersz-realizacja:hover td.dzien { background: var(--bg); }
 /* przeciąganie dyżuru na inny dzień (w obrębie tej samej osoby) */
 table.grid td.dzien[draggable="true"] { cursor: grab; }
 table.grid td.dzien.dragging { opacity: 0.35; }
 table.grid td.dzien.drag-over { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-bg); }
-table.grid td.dzien > * { display: block; margin: 0 auto 3px; }
-table.grid td.dzien > *:last-child { margin-bottom: 0; }
 .kod-chip {
-  display: inline-block; min-width: 42px; padding: 5px 4px; border-radius: 6px;
-  font-weight: 700; color: var(--muted); font-size: 13px;
+  display: inline-block; min-width: 0; width: 100%; padding: 4px 1px; border-radius: 5px;
+  font-weight: 700; color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-/* realizacja (drugi „wiersz" w komórce, jeśli inna niż plan — wzorem płachty) */
-.kod-chip.small { min-width: 34px; padding: 3px 4px; font-size: 11.5px; opacity: 0.9; }
-/* adnotacja „z kim zamiana" (imię/nazwisko partnera zamiany) */
-.zamiana-note {
-  font-size: 10.5px; color: var(--accent-text); font-weight: 700; line-height: 1.25;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 62px;
-  margin: 0 auto;
+/* realizacja (własny, zawsze widoczny wiersz pod planem — wzorem płachty) - pusta
+   komórka, jeśli realizacja jest taka sama jak plan (patrz chipRealizacjiHtml). */
+.kod-chip.small { padding: 2px 1px; font-size: 9.5px; opacity: 0.9; }
+/* adnotacja „z kim zamiana" - kropka w rogu komórki planu, pełne nazwisko w title */
+.zamiana-dot {
+  position: absolute; top: 1px; right: 2px; font-size: 9px; line-height: 1;
+  color: var(--accent-text); font-weight: 700; cursor: default;
 }
 .kod-chip.k-D { background: var(--role-d-bg); color: var(--role-d-text); }
 .kod-chip.k-N { background: var(--role-n-bg); color: var(--role-n-text); }

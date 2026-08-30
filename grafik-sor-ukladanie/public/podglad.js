@@ -26,22 +26,22 @@ function nazwiskoPo(pracownicy, id) {
   return p ? p.imieNazwisko : '?';
 }
 
-// komorkaHtml — ta sama logika co w panelu admina (public/admin.js): plan zawsze,
-// realizacja jako mniejszy „chip" pod spodem jeśli inna niż plan, adnotacja
-// „↔ Nazwisko" jeśli zaznaczono z kim była zamiana. Podgląd jest tylko-do-odczytu,
-// bez obsługi kliknięcia.
-function komorkaHtml(w, pracownicy) {
+// chipPlanHtml/chipRealizacjiHtml — ta sama logika co w panelu admina (public/admin.js):
+// siatka jest na stałe dwuwierszowa na osobę (plan / realizacja, wzorem płachty).
+// Podgląd jest tylko-do-odczytu, bez obsługi kliknięcia/przeciągania.
+function chipPlanHtml(w, pracownicy) {
   const kod = w ? w.kod : '';
-  const kodRealizacji = w && w.kodRealizacji ? w.kodRealizacji : '';
-  const maInnaRealizacje = kodRealizacji && kodRealizacji !== kod;
   let html = '<span class="kod-chip k-' + (kod || 'brak') + '"' + (OPISY_KODOW[kod] ? ' title="' + OPISY_KODOW[kod] + '"' : '') + '>' + (ETYKIETY_KODOW[kod] || kod || '—') + '</span>';
-  if (maInnaRealizacje) {
-    html += '<span class="kod-chip small realizacja k-' + kodRealizacji + '">' + (ETYKIETY_KODOW[kodRealizacji] || kodRealizacji) + '</span>';
-  }
   if (w && w.zamianaZId) {
-    html += '<span class="zamiana-note" title="Zamiana z ' + nazwiskoPo(pracownicy, w.zamianaZId) + '">↔ ' + nazwiskoPo(pracownicy, w.zamianaZId) + '</span>';
+    html += '<span class="zamiana-dot" title="Zamiana z ' + nazwiskoPo(pracownicy, w.zamianaZId) + '">⇄</span>';
   }
   return html;
+}
+function chipRealizacjiHtml(w) {
+  const kod = w ? w.kod : '';
+  const kodRealizacji = w && w.kodRealizacji ? w.kodRealizacji : '';
+  if (!kodRealizacji || kodRealizacji === kod) return '';
+  return '<span class="kod-chip small k-' + kodRealizacji + '"' + (OPISY_KODOW[kodRealizacji] ? ' title="' + OPISY_KODOW[kodRealizacji] + '"' : '') + '>' + (ETYKIETY_KODOW[kodRealizacji] || kodRealizacji) + '</span>';
 }
 
 function tabelaGrafiku(grupa, tytul, rok, miesiac, pracownicy, wpisy) {
@@ -49,16 +49,24 @@ function tabelaGrafiku(grupa, tytul, rok, miesiac, pracownicy, wpisy) {
   if (!osoby.length) return '';
   const dni = liczbaDniMiesiaca(rok, miesiac);
   let html = '<h3 style="margin:18px 0 8px; text-transform:none; font-size:14px; color:var(--text)">' + tytul + '</h3>';
-  html += '<div class="grid-scroll"><table class="grid"><thead><tr><th class="nazwa">Pracownik</th>';
+  html += '<div class="grid-scroll"><table class="grid"><colgroup><col class="col-nazwa">';
+  for (let d = 1; d <= dni; d++) html += '<col>';
+  html += '</colgroup><thead><tr><th class="nazwa">Pracownik</th>';
   for (let d = 1; d <= dni; d++) html += '<th' + (jestWeekend(rok, miesiac, d) ? ' class="weekend"' : '') + '>' + d + '</th>';
   html += '</tr></thead><tbody>';
   osoby.forEach((p) => {
     const sap = (p.flagi && p.flagi.includes('starszy_asystent')) ? ' 🩺' : '';
-    html += '<tr><td class="nazwa">' + p.imieNazwisko + sap + '</td>';
+    html += '<tr class="wiersz-plan"><td class="nazwa" rowspan="2">' + p.imieNazwisko + sap + '</td>';
     for (let d = 1; d <= dni; d++) {
       const dataX = dataStr(rok, miesiac, d);
       const wpis = wpisy.find((w) => w.pracownikId === p.id && w.data === dataX && w.slot === 1);
-      html += '<td class="dzien' + (jestWeekend(rok, miesiac, d) ? ' weekend' : '') + '">' + komorkaHtml(wpis, pracownicy) + '</td>';
+      html += '<td class="dzien' + (jestWeekend(rok, miesiac, d) ? ' weekend' : '') + '">' + chipPlanHtml(wpis, pracownicy) + '</td>';
+    }
+    html += '</tr><tr class="wiersz-realizacja">';
+    for (let d = 1; d <= dni; d++) {
+      const dataX = dataStr(rok, miesiac, d);
+      const wpis = wpisy.find((w) => w.pracownikId === p.id && w.data === dataX && w.slot === 1);
+      html += '<td class="dzien' + (jestWeekend(rok, miesiac, d) ? ' weekend' : '') + '">' + chipRealizacjiHtml(wpis) + '</td>';
     }
     html += '</tr>';
   });

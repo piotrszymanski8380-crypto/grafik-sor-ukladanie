@@ -473,22 +473,23 @@ function nazwiskoPracownika(id) {
   return p ? p.imieNazwisko : '?';
 }
 
-// komorkaHtml(w) — treść komórki siatki: plan (zawsze), a jeśli ustawiona inna
-// realizacja niż plan — mniejszy „chip" realizacji pod spodem (wzorem drugiego
-// wiersza w realnym arkuszu „płachta"), plus etykieta „↔ Nazwisko", jeśli
-// zaznaczono z kim nastąpiła zamiana.
-function komorkaHtml(w) {
+// chipPlanHtml/chipRealizacjiHtml — treść pojedynczej komórki w dwuwierszowej
+// siatce (wiersz PLAN nad wierszem REALIZACJA tej samej osoby, na stałe - wzorem
+// realnego arkusza „płachta"). Adnotacja „z kim zamiana" to mała kropka ⇄ w rogu
+// komórki planu (tooltip z nazwiskiem), żeby nie rozsadzać wąskiej kolumny.
+function chipPlanHtml(w) {
   const kod = w ? w.kod : '';
-  const kodRealizacji = w && w.kodRealizacji ? w.kodRealizacji : '';
-  const maInnaRealizacje = kodRealizacji && kodRealizacji !== kod;
   let html = '<span class="kod-chip k-' + (kod || 'brak') + '"' + (OPISY_KODOW[kod] ? ' title="' + OPISY_KODOW[kod] + '"' : '') + '>' + (ETYKIETY_KODOW[kod] || kod || '—') + '</span>';
-  if (maInnaRealizacje) {
-    html += '<span class="kod-chip small realizacja k-' + kodRealizacji + '">' + (ETYKIETY_KODOW[kodRealizacji] || kodRealizacji) + '</span>';
-  }
   if (w && w.zamianaZId) {
-    html += '<span class="zamiana-note" title="Zamiana z ' + nazwiskoPracownika(w.zamianaZId) + '">↔ ' + nazwiskoPracownika(w.zamianaZId) + '</span>';
+    html += '<span class="zamiana-dot" title="Zamiana z ' + nazwiskoPracownika(w.zamianaZId) + '">⇄</span>';
   }
   return html;
+}
+function chipRealizacjiHtml(w) {
+  const kod = w ? w.kod : '';
+  const kodRealizacji = w && w.kodRealizacji ? w.kodRealizacji : '';
+  if (!kodRealizacji || kodRealizacji === kod) return '';
+  return '<span class="kod-chip small k-' + kodRealizacji + '"' + (OPISY_KODOW[kodRealizacji] ? ' title="' + OPISY_KODOW[kodRealizacji] + '"' : '') + '>' + (ETYKIETY_KODOW[kodRealizacji] || kodRealizacji) + '</span>';
 }
 
 // ---- przeciąganie dyżuru na inny dzień (w obrębie TEJ SAMEJ osoby) ----
@@ -553,22 +554,42 @@ async function onDrop(ev) {
   await zapiszKomorke(pracownikId, dataZrodlo, polaCeluStare);
 }
 
+// renderTabeleGrafiku — siatka na STAŁE dwuwierszowa na osobę (wiersz PLAN nad
+// wierszem REALIZACJA, wzorem realnego arkusza „płachta" - patrz komentarz przy
+// chipPlanHtml/chipRealizacjiHtml powyżej), a kolumny dni dzielą się równo na
+// całą szerokość karty (table-layout:fixed + colgroup) tak, żeby cały miesiąc
+// (do 31 dni) mieścił się na ekranie bez przewijania w poziomie (2026-08-30,
+// feedback: "powinna być możliwość widać cały mc na ekranie / plan realizacja
+// u każdego pracownika").
 function renderTabeleGrafiku(grupa, elementId) {
   const tbl = document.getElementById(elementId);
   const osoby = pracownicy.filter((p) => p.grupa === grupa);
   const dni = liczbaDniMiesiaca(rok, miesiac);
-  let html = '<thead><tr><th class="nazwa">Pracownik</th>';
+  let html = '<colgroup><col class="col-nazwa">';
+  for (let d = 1; d <= dni; d++) html += '<col>';
+  html += '</colgroup>';
+  html += '<thead><tr><th class="nazwa">Pracownik</th>';
   for (let d = 1; d <= dni; d++) html += '<th' + (jestWeekend(rok, miesiac, d) ? ' class="weekend"' : '') + '>' + d + '</th>';
   html += '</tr></thead><tbody>';
   osoby.forEach((p) => {
     const opis = [p.forma, p.stanowisko].filter(Boolean).join(', ');
     const sap = (p.flagi && p.flagi.includes('starszy_asystent')) ? ' 🩺' : '';
-    html += '<tr><td class="nazwa">' + p.imieNazwisko + sap + ' <span class="note">(' + opis + ')</span></td>';
+    // wiersz PLAN — komórka nazwiska ma rowspan=2 i przykrywa też wiersz realizacji
+    html += '<tr class="wiersz-plan"><td class="nazwa" rowspan="2" title="' + opis + '">' + p.imieNazwisko + sap + '</td>';
     for (let d = 1; d <= dni; d++) {
       const dataX = dataStr(rok, miesiac, d);
       const w = wpisDnia(p.id, dataX);
-      html += '<td class="dzien' + (jestWeekend(rok, miesiac, d) ? ' weekend' : '') + '" data-p="' + p.id + '" data-d="' + d + '"' +
-        (w && w.kod ? ' draggable="true"' : '') + '>' + komorkaHtml(w) + '</td>';
+      html += '<td class="dzien plan-row' + (jestWeekend(rok, miesiac, d) ? ' weekend' : '') + '" data-p="' + p.id + '" data-d="' + d + '"' +
+        (w && w.kod ? ' draggable="true"' : '') + '>' + chipPlanHtml(w) + '</td>';
+    }
+    html += '</tr>';
+    // wiersz REALIZACJA — bez komórki nazwiska (przykryta rowspanem powyżej);
+    // pusta, jeśli realizacja == plan (albo brak wpisu) - jak druga linia w płachcie.
+    html += '<tr class="wiersz-realizacja">';
+    for (let d = 1; d <= dni; d++) {
+      const dataX = dataStr(rok, miesiac, d);
+      const w = wpisDnia(p.id, dataX);
+      html += '<td class="dzien realizacja-row' + (jestWeekend(rok, miesiac, d) ? ' weekend' : '') + '" data-p="' + p.id + '" data-d="' + d + '">' + chipRealizacjiHtml(w) + '</td>';
     }
     html += '</tr>';
   });
