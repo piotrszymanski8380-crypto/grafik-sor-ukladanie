@@ -288,6 +288,7 @@ const GRF_KATALOG_REGUL = [
   { id: 'W16', waga: 'soft', opis: 'Roczne limity siły wyższej (SW) i opieki nad dzieckiem (Op).' },
   { id: 'W17', waga: 'soft', opis: 'Pilnowanie odbioru dnia wolnego za pracę w niedzielę/święto/sobotę (Wn/Ws).' },
   { id: 'W18', waga: 'soft', opis: 'Sprawiedliwy rozkład liczby dyżurów (D+N+DOBA) między etatowymi tej samej grupy w 2-miesięcznym okresie rozliczeniowym.' },
+  { id: 'W20', waga: 'soft', opis: 'Co najmniej co 4. niedziela wolna od pracy (etat) - art. 151(12) KP.' },
 ];
 
 /** Czy dana reguła jest aktywna (brak jej na liście parametry.wylaczoneReguly). */
@@ -894,6 +895,35 @@ function ostrzezeniaMiesiaca(wpisy, pracownicy, rok, miesiac, parametry, wpisyRo
           sev: 'soft', rule: 'W11', pracownikId: p.id, data: dataOf(1),
           komunikat: 'Wykorzystano ' + dniUW + ' dni UW, pula wynosi ' + p.pulaUrlopuDni + '.',
         });
+      }
+    }
+
+    // W20 - co najmniej co 4. niedziela wolna od pracy (art. 151(12) KP) - dopisane
+    // 2026-08-30 na prośbę Piotra. TYLKO ETAT (potwierdzone przez AskUserQuestion,
+    // analogicznie do W4/W6/W18 - kontrakt/zlecenie bez tego ograniczenia). MIĘKKA
+    // (jak większość reguł czasu pracy w tej appce - jednoznaczne liczenie tygodni
+    // pracy zmianowej bywa niejasne przy urlopach/zmianach w trakcie okresu).
+    // Sprawdzane na `roczne`/`indeksRoczny` (CAŁY rok kalendarzowy), NIE tylko na
+    // przeglądanym miesiącu - inaczej 4-niedzielne okno blisko początku miesiąca
+    // dałoby fałszywy negatyw (analogicznie do W17/grfMaOdbiorWOknie wyżej).
+    // Zgłaszane na KAŻDEJ niedzieli z dyżurem, jeśli trzy poprzedzające niedziele
+    // (dokładnie 7/14/21 dni wcześniej) TEŻ miały dyżur - nie tylko na "dokładnie
+    // 4.", żeby appka nie przestała ostrzegać, gdyby seria ciągnęła się dalej.
+    if (p.forma === 'etat') {
+      for (var dNiedz = 1; dNiedz <= dniWMiesiacu; dNiedz++) {
+        var dataNiedz = dataOf(dNiedz);
+        if (grfDataDoObiektu(dataNiedz).getUTCDay() !== 0) continue; // tylko niedziele
+        if (!grfJestZmiana(grfGlownyKod(indeksRoczny, p.id, dataNiedz))) continue;
+        var poprzednie3NiedzieleW20 = [1, 2, 3].map(function (n) { return dodajDni(dataNiedz, -7 * n); });
+        var wszystkiePracowalyW20 = poprzednie3NiedzieleW20.every(function (dPop) {
+          return grfJestZmiana(grfGlownyKod(indeksRoczny, p.id, dPop));
+        });
+        if (wszystkiePracowalyW20) {
+          out.push({
+            sev: 'soft', rule: 'W20', pracownikId: p.id, data: dataNiedz,
+            komunikat: '4. niedziela z rzędu z dyżurem - brak niedzieli wolnej co najmniej raz na 4 tygodnie (art. 151(12) KP).',
+          });
+        }
       }
     }
   });
