@@ -1014,10 +1014,49 @@ function grfHm(h) {
 // ---------- F2.4: podpowiedzi kandydatów na dziurę obsadową ----------
 
 /**
+ * grfPodpowiedzCyklu(wpisy, pracownikId, data) -> 'D' | 'N' | 'W' | null
+ *
+ * Dopisane 2026-08-30 na prośbę Piotra: "u pracowników etatowych układ dyżurów
+ * jest D,N,W,W,D,N - to nie jest sztywna reguła, jeżeli jest potrzeba to nie
+ * obowiązuje, ale obowiązują inne reguły [czasu pracy]". Potwierdzone przez
+ * AskUserQuestion: to WYŁĄCZNIE PODPOWIEDŹ dla generatora ("Generuj brakujące"),
+ * NIE osobna reguła na liście Ostrzeżeń/Ustawienia - generator próbuje układać
+ * etatowym ten cykl, ale gdy trzeba (obsada, reguły odpoczynku itd.), swobodnie
+ * od niego odstępuje - patrz kandydaciNaDziure() niżej, gdzie to tylko PIERWSZE
+ * kryterium sortowania (nie filtr, nic nie blokuje).
+ *
+ * Cykl liczony jako PRZESUWNY wg ostatniego dyżuru danej osoby (nie sztywna
+ * siatka od 1. dnia miesiąca - potwierdzone przez Piotra):
+ *   po D -> preferowane N nazajutrz,
+ *   po N -> preferowane W (odpoczynek) przez kolejne 2 dni,
+ *   po 2 dniach odpoczynku po N -> preferowane znów D.
+ * Jeśli historia (3 dni wstecz) nie daje jednoznacznej podpowiedzi (początek
+ * miesiąca, urlop/chorobowe w tym oknie, dawno nieprzepracowany dyżur itd.),
+ * zwraca null - generator wtedy nie ma preferencji z tego tytułu i sortuje
+ * kandydatów wyłącznie wg dotychczasowego wykorzystania wymiaru (jak dotąd).
+ */
+function grfPodpowiedzCyklu(wpisy, pracownikId, data) {
+  var indeks = zbudujIndeks(wpisy);
+  var wczoraj1 = grfGlownyKod(indeks, pracownikId, dodajDni(data, -1));
+  var wczoraj2 = grfGlownyKod(indeks, pracownikId, dodajDni(data, -2));
+  var wczoraj3 = grfGlownyKod(indeks, pracownikId, dodajDni(data, -3));
+  var wolny = function (kod) { return !kod || kod === 'W'; };
+
+  if (wczoraj1 === 'D') return 'N';
+  if (wczoraj1 === 'N') return 'W'; // 1. dzień odpoczynku po nocce
+  if (wczoraj2 === 'N' && wolny(wczoraj1)) return 'W'; // 2. dzień odpoczynku po nocce
+  if (wczoraj3 === 'N' && wolny(wczoraj2) && wolny(wczoraj1)) return 'D'; // wzorzec: wracamy do D
+  return null;
+}
+
+/**
  * kandydaciNaDziure(data, typZmiany, grupa, wpisy, pracownicy, rok, miesiac, parametry)
  * Zwraca pracowników bez wpisu tego dnia, którzy mogą wziąć zmianę bez naruszenia
- * reguł twardych, posortowanych rosnąco po wykorzystaniu wymiaru (nie po godzinach
- * bezwzględnych - etaty cząstkowe zawyżałyby ranking).
+ * reguł twardych, posortowanych: NAJPIERW wg zgodności z podpowiedzią cyklu
+ * D,N,W,W,D,N (tylko etat - patrz grfPodpowiedzCyklu, to tylko podpowiedź, nie
+ * filtr - nikogo nie wyklucza), POTEM (w ramach tej samej zgodności) rosnąco po
+ * wykorzystaniu wymiaru (nie po godzinach bezwzględnych - etaty cząstkowe
+ * zawyżałyby ranking).
  */
 function kandydaciNaDziure(data, typZmiany, grupa, wpisy, pracownicy, rok, miesiac, parametry) {
   parametry = parametry || DOMYSLNE_PARAMETRY;
@@ -1027,9 +1066,22 @@ function kandydaciNaDziure(data, typZmiany, grupa, wpisy, pracownicy, rok, miesi
     .filter(function (p) { return grfKodyDnia(indeks, p.id, data).length === 0; })
     .filter(function (p) { return blokada(p, data, typZmiany, wpisy, parametry) === null; })
     .map(function (p) {
-      return { pracownik: p, wykorzystanieWymiaru: godzinyPracownika(wpisy, p.id, grfWymiarEtatu(p)) / (wymiarMiesieczny(p, rok, miesiac, parametry) || 1) };
+      var podpowiedz = p.forma === 'etat' ? grfPodpowiedzCyklu(wpisy, p.id, data) : null;
+      // 0 = cykl poleca dokładnie ten typ dziś (najlepiej dopasowany kandydat),
+      // 1 = brak jednoznacznej podpowiedzi (neutralnie, jak dotychczas),
+      // 2 = cykl sugerowałby dziś odpoczynek - najmniej preferowany, ale wciąż
+      //     dopuszczalny (reguła NIE jest sztywna).
+      var zgodnoscCyklu = podpowiedz === typZmiany ? 0 : podpowiedz === null ? 1 : 2;
+      return {
+        pracownik: p,
+        zgodnoscCyklu: zgodnoscCyklu,
+        wykorzystanieWymiaru: godzinyPracownika(wpisy, p.id, grfWymiarEtatu(p)) / (wymiarMiesieczny(p, rok, miesiac, parametry) || 1),
+      };
     })
-    .sort(function (a, b) { return a.wykorzystanieWymiaru - b.wykorzystanieWymiaru; })
+    .sort(function (a, b) {
+      if (a.zgodnoscCyklu !== b.zgodnoscCyklu) return a.zgodnoscCyklu - b.zgodnoscCyklu;
+      return a.wykorzystanieWymiaru - b.wykorzystanieWymiaru;
+    })
     .map(function (x) { return x.pracownik; });
 }
 
@@ -1144,6 +1196,7 @@ if (typeof module !== 'undefined' && module.exports) {
     grfMaOdbiorWOknie: grfMaOdbiorWOknie,
     odm: odm,
     ostrzezeniaMiesiaca: ostrzezeniaMiesiaca,
+    grfPodpowiedzCyklu: grfPodpowiedzCyklu,
     kandydaciNaDziure: kandydaciNaDziure,
     generujBrakujaceDyzury: generujBrakujaceDyzury,
   };
