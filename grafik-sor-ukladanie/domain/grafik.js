@@ -248,6 +248,13 @@ const DOMYSLNE_PARAMETRY = {
   // grfSwietaRoku wyżej. Wygenerowane automatycznie, ale appka pozwala nadpisać
   // przez zmianę parametru (np. gdyby zakres lat trzeba było rozszerzyć).
   swieta: grfSwietaLat(2025, 2032),
+  // W18 - tolerancja (w SZTUKACH dyżurów D+N+DOBA) przy porównaniu sumy dyżurów
+  // etatowych w tej samej grupie w CAŁYM 2-miesięcznym okresie rozliczeniowym -
+  // dopisane 2026-08-30 na prośbę Piotra ("mniej więcej równa liczba dyżurów,
+  // jeśli się nie uda w jednym miesiącu to żeby było mniej więcej po równo w obu
+  // rozliczeniowych"). To CEL SPRAWIEDLIWOŚCI oddziału, nie przepis prawa - stąd
+  // osobny, swobodnie regulowalny parametr (nie jak np. limitNzDniRok).
+  tolerancjaRozkladuDyzurowSztuk: 3,
   // Reguły ręcznie wyłączone przez administratora (panel Ustawienia -> Reguły) -
   // lista id-ków z GRF_KATALOG_REGUL niżej, np. ['W4','W13']. Domyślnie puste -
   // wszystkie reguły aktywne. Persystencja: api/reguly.js (ustawienia-reguly.json),
@@ -280,6 +287,7 @@ const GRF_KATALOG_REGUL = [
   { id: 'W15', waga: 'soft', opis: 'Zakres godzin min/max miesięcznie dla zlecenia/kontraktu.' },
   { id: 'W16', waga: 'soft', opis: 'Roczne limity siły wyższej (SW) i opieki nad dzieckiem (Op).' },
   { id: 'W17', waga: 'soft', opis: 'Pilnowanie odbioru dnia wolnego za pracę w niedzielę/święto/sobotę (Wn/Ws).' },
+  { id: 'W18', waga: 'soft', opis: 'Sprawiedliwy rozkład liczby dyżurów (D+N+DOBA) między etatowymi tej samej grupy w 2-miesięcznym okresie rozliczeniowym.' },
 ];
 
 /** Czy dana reguła jest aktywna (brak jej na liście parametry.wylaczoneReguly). */
@@ -523,6 +531,19 @@ function godzinyPracownika(wpisy, pracownikId, etat) {
   return wpisy
     .filter(function (w) { return w.pracownikId === pracownikId; })
     .reduce(function (suma, w) { return suma + godzinyKodu(grfKodEfektywny(w), etat); }, 0);
+}
+
+/**
+ * grfLiczbaDyzurowOsoby(wpisy, pracownikId) -> liczba SZTUK dyżurów roboczych
+ * (D+N+DOBA, wg kodu EFEKTYWNEGO - patrz grfKodEfektywny) danej osoby w `wpisy`.
+ * Do W18 (sprawiedliwy rozkład dyżurów) - w odróżnieniu od godzinyPracownika()
+ * liczy SZTUKI, nie godziny (żeby dniówka i doba nie ważyły różnie w porównaniu
+ * "kto ile razy dyżurował").
+ */
+function grfLiczbaDyzurowOsoby(wpisy, pracownikId) {
+  return wpisy.filter(function (w) {
+    return w.pracownikId === pracownikId && grfJestZmiana(grfKodEfektywny(w));
+  }).length;
 }
 
 /** Wymiar miesięczny: norma dobowa x dni robocze miesiąca (bez sobót/niedziel/świąt) x etat. */
@@ -870,6 +891,50 @@ function ostrzezeniaMiesiaca(wpisy, pracownicy, rok, miesiac, parametry, wpisyRo
     }
   });
 
+  // W18 - sprawiedliwy rozkład SUMY dyżurów (D+N+DOBA, w SZTUKACH) między
+  // pracownikami etatowymi TEJ SAMEJ GRUPY (main/opie porównywani osobno - różne
+  // role, różne obciążenie) - dopisane 2026-08-30 na prośbę Piotra. Liczone dla
+  // CAŁEGO 2-miesięcznego okresu rozliczeniowego, nie pojedynczego miesiąca -
+  // "jeśli się nie uda w jednym miesiącu, to żeby było mniej więcej po równo w
+  // obu rozliczeniowych" - dlatego zgłaszane TYLKO przy przeglądzie DRUGIEGO
+  // (zamykającego) miesiąca pary, tak jak W5, i `wpisy` muszą obejmować OBA
+  // miesiące pary (patrz komentarz przy W5 wyżej / api/grafik.js wpisyOkresu()).
+  // Z porównania WYŁĄCZENI (nie da się/nie trzeba ich równać do reszty):
+  //   - main: flaga 'bez_nocek' (fizycznie nie może brać dyżurów N),
+  //   - opie: typ dyżuru 'tylko_dzien' (nie bierze dyżurów N),
+  //   - obie grupy: flaga 'zgoda_mniej_nocek' (indywidualna, dobrowolna zgoda
+  //     pracownika na mniejszą liczbę dyżurów/nocek niż reszta zespołu).
+  // To CEL SPRAWIEDLIWOŚCI oddziału (miękka, orientacyjna), nie przepis prawa -
+  // stąd osobny parametr tolerancji (parametry.tolerancjaRozkladuDyzurowSztuk),
+  // nie sztywna wartość w kodzie.
+  var startOkresuW18 = grfMiesiacStartuOkresu(miesiac);
+  if (miesiac === startOkresuW18 + 1) {
+    ['main', 'opie'].forEach(function (grupaW18) {
+      var doPorownaniaW18 = pracownicy.filter(function (p) {
+        if (p.grupa !== grupaW18 || p.forma !== 'etat') return false;
+        if (p.flagi && p.flagi.indexOf('zgoda_mniej_nocek') !== -1) return false;
+        if (grupaW18 === 'main' && p.flagi && p.flagi.indexOf('bez_nocek') !== -1) return false;
+        if (grupaW18 === 'opie' && p.typyDyzuru && p.typyDyzuru.indexOf('tylko_dzien') !== -1) return false;
+        return true;
+      });
+      if (doPorownaniaW18.length < 2) return; // nie ma z kim porównywać
+      var sumyW18 = doPorownaniaW18.map(function (p) {
+        return { p: p, suma: grfLiczbaDyzurowOsoby(wpisy, p.id) };
+      });
+      var sredniaW18 = sumyW18.reduce(function (s, x) { return s + x.suma; }, 0) / sumyW18.length;
+      var tolerancjaW18 = parametry.tolerancjaRozkladuDyzurowSztuk == null ? 3 : parametry.tolerancjaRozkladuDyzurowSztuk;
+      sumyW18.forEach(function (x) {
+        if (Math.abs(x.suma - sredniaW18) > tolerancjaW18) {
+          out.push({
+            sev: 'soft', rule: 'W18', pracownikId: x.p.id, data: dataOf(1),
+            komunikat: 'Nierówny rozkład dyżurów w okresie rozliczeniowym (grupa ' + grupaW18 + '): ' +
+              x.suma + ' wobec średniej ' + sredniaW18.toFixed(1) + ' w zespole (tolerancja ±' + tolerancjaW18 + ').',
+          });
+        }
+      });
+    });
+  }
+
   // W8 - obsada minimalna, per dzień x grupa x typ zmiany. TWARDA - POTWIERDZONE
   // przez Piotra 2026-08-13: to nie miękki cel tylko wymagane minimum bezpieczeństwa
   // (16 main / 4 opie na dyżurze) - wcześniej ta reguła była zawsze miękka (soft).
@@ -1064,6 +1129,7 @@ if (typeof module !== 'undefined' && module.exports) {
     obsadaDnia: obsadaDnia,
     obsadaPielegniarekDnia: obsadaPielegniarekDnia,
     godzinyPracownika: godzinyPracownika,
+    grfLiczbaDyzurowOsoby: grfLiczbaDyzurowOsoby,
     wymiarMiesieczny: wymiarMiesieczny,
     wymiarOkresuRozliczeniowego: wymiarOkresuRozliczeniowego,
     godzinyOkresuRozliczeniowego: godzinyOkresuRozliczeniowego,
