@@ -37,6 +37,31 @@ function pokazMsg(id, tekst, klasa) {
   document.getElementById(id).innerHTML = tekst ? '<div class="msg ' + klasa + '">' + tekst + '</div>' : '';
 }
 
+// pokazBladStartu(e) — dopisane 2026-08-30 po incydencie "pusta/biała strona panelu
+// bez żadnego komunikatu" (np. gdy przeglądarka wczyta z cache starszy admin.html
+// razem z nowszym admin.js po deployu, i skrypt rzuci wyjątkiem na elemencie,
+// którego jeszcze nie ma w DOM). BEZ TEGO taki wyjątek w wystartuj()/sprawdzSesje()
+// kończył się CAŁKOWICIE PUSTYM ekranem (ani login, ani appka) bez żadnej wskazówki -
+// wyglądało to jak utrata danych, choć dane na serwerze były cały czas nietknięte.
+// Teraz zamiast tego appka pokazuje czerwony baner z treścią błędu, żeby dało się
+// go zrelacjonować/zrzucić ekran zamiast zgadywać. Dane pracowników/grafiku same w
+// sobie NIE są tu w żaden sposób kasowane - ten kod tylko RYSUJE komunikat.
+function pokazBladStartu(e) {
+  console.error('Błąd startu appki:', e);
+  let baner = document.getElementById('blad-startu-baner');
+  if (!baner) {
+    baner = document.createElement('div');
+    baner.id = 'blad-startu-baner';
+    baner.style.cssText = 'position:fixed; top:0; left:0; right:0; z-index:9999; background:#c22222; color:#fff; ' +
+      'padding:14px 18px; font:13px/1.5 -apple-system,sans-serif; white-space:pre-wrap;';
+    document.body.prepend(baner);
+  }
+  baner.textContent = 'Błąd aplikacji - odśwież stronę (Ctrl+Shift+R / Cmd+Shift+R). ' +
+    'Jeśli się powtarza, zrób zrzut ekranu tego komunikatu: ' + (e && e.message ? e.message : String(e));
+}
+window.addEventListener('error', (ev) => pokazBladStartu(ev.error || ev.message));
+window.addEventListener('unhandledrejection', (ev) => pokazBladStartu(ev.reason));
+
 async function api(sciezka, opcje) {
   const res = await fetch(sciezka, Object.assign({ credentials: 'same-origin' }, opcje));
   const dane = await res.json().catch(() => ({}));
@@ -52,7 +77,14 @@ async function sprawdzSesje() {
   if (isAdmin) {
     document.getElementById('login-widok').style.display = 'none';
     document.getElementById('app-widok').style.display = 'flex';
-    await wystartuj();
+    try {
+      await wystartuj();
+    } catch (e) {
+      // Patrz komentarz przy pokazBladStartu() - bez tego try/catch appka po
+      // zalogowaniu zostawała PUSTA (żadnego widoku, żadnego komunikatu), jeśli
+      // cokolwiek w wystartuj() rzuciło wyjątek.
+      pokazBladStartu(e);
+    }
   } else {
     document.getElementById('login-widok').style.display = 'flex';
     document.getElementById('app-widok').style.display = 'none';
@@ -906,4 +938,4 @@ document.getElementById('btn-eksport-excel').addEventListener('click', () => {
   XLSX.writeFile(wb, 'grafik-' + String(miesiac).padStart(2, '0') + '-' + rok + '.xlsx');
 });
 
-sprawdzSesje();
+sprawdzSesje().catch(pokazBladStartu);
