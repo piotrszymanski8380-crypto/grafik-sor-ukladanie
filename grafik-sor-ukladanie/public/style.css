@@ -121,40 +121,42 @@ label { font-size: 13px; color: var(--muted); display: flex; align-items: center
 .segmented button.active { background: var(--panel); color: var(--text); box-shadow: var(--shadow); font-weight: 600; }
 
 /* ---------- siatka grafiku ---------- */
+/* Rozmiary powiększone 2026-08-30 (feedback: siatka za mała, nie widać stosu
+   plan/realizacja przy wpisywaniu) - większe komórki, większe czcionki. */
 .grid-scroll { overflow-x: auto; }
-table.grid { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+table.grid { border-collapse: collapse; width: 100%; font-size: 14px; }
 table.grid th, table.grid td { padding: 0; text-align: center; border-bottom: 1px solid var(--border); }
 table.grid thead th {
-  padding: 9px 6px; font-weight: 500; color: var(--muted); background: var(--panel);
-  position: sticky; top: 0; z-index: 2; white-space: nowrap;
+  padding: 11px 8px; font-weight: 600; color: var(--muted); background: var(--panel);
+  position: sticky; top: 0; z-index: 2; white-space: nowrap; font-size: 13px;
 }
 table.grid thead th.weekend { background: var(--soft-bg); color: var(--soft); }
 table.grid td.nazwa, table.grid th.nazwa {
   position: sticky; left: 0; background: var(--panel); z-index: 3; text-align: left;
-  padding: 8px 12px; white-space: nowrap; font-weight: 600; border-right: 1px solid var(--border);
+  padding: 10px 14px; white-space: nowrap; font-weight: 600; border-right: 1px solid var(--border);
 }
 table.grid tbody tr:hover td { background: var(--bg); }
 table.grid tbody tr:hover td.nazwa { background: var(--bg); }
 table.grid td.dzien {
-  padding: 4px; cursor: pointer; min-width: 46px;
+  padding: 6px 4px; cursor: pointer; min-width: 68px; height: 52px;
   display: table-cell; vertical-align: middle;
 }
 /* przeciąganie dyżuru na inny dzień (w obrębie tej samej osoby) */
 table.grid td.dzien[draggable="true"] { cursor: grab; }
 table.grid td.dzien.dragging { opacity: 0.35; }
 table.grid td.dzien.drag-over { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-bg); }
-table.grid td.dzien > * { display: block; margin: 0 auto 2px; }
+table.grid td.dzien > * { display: block; margin: 0 auto 3px; }
 table.grid td.dzien > *:last-child { margin-bottom: 0; }
 .kod-chip {
-  display: inline-block; min-width: 34px; padding: 4px 0; border-radius: 6px;
-  font-weight: 600; color: var(--muted);
+  display: inline-block; min-width: 42px; padding: 5px 4px; border-radius: 6px;
+  font-weight: 700; color: var(--muted); font-size: 13px;
 }
 /* realizacja (drugi „wiersz" w komórce, jeśli inna niż plan — wzorem płachty) */
-.kod-chip.small { min-width: 26px; padding: 2px 0; font-size: 10px; opacity: 0.85; }
+.kod-chip.small { min-width: 34px; padding: 3px 4px; font-size: 11.5px; opacity: 0.9; }
 /* adnotacja „z kim zamiana" (imię/nazwisko partnera zamiany) */
 .zamiana-note {
-  font-size: 9px; color: var(--accent-text); font-weight: 600; line-height: 1.2;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 44px;
+  font-size: 10.5px; color: var(--accent-text); font-weight: 700; line-height: 1.25;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 62px;
   margin: 0 auto;
 }
 .kod-chip.k-D { background: var(--role-d-bg); color: var(--role-d-text); }
@@ -176,20 +178,26 @@ table.grid td.dzien > *:last-child { margin-bottom: 0; }
 .kod-chip.k-Nn { background: var(--hard-bg); color: var(--hard); font-size: 10.5px; }
 
 /* ---------- popover edycji komórki (Plan / Realizacja / Zamiana z) ---------- */
+/* Poszerzony i ułożony w siatkę 2026-08-30 (22 kody nie mieściły się czytelnie
+   we flex-wrap na 260px) - większe kafelki, stała liczba kolumn. */
 .grid-scroll { position: relative; }
 .kod-picker {
-  position: absolute; display: none; flex-direction: column; gap: 8px; width: 260px;
+  position: absolute; display: none; flex-direction: column; gap: 10px; width: 340px;
+  max-height: 420px; overflow-y: auto;
   background: var(--panel); border: 1px solid var(--border-strong); border-radius: var(--radius);
-  box-shadow: var(--shadow-md); padding: 10px; z-index: 20;
+  box-shadow: var(--shadow-md); padding: 12px; z-index: 20;
 }
 .kod-picker.open { display: flex; }
-.kp-sekcja { display: flex; flex-direction: column; gap: 5px; }
+.kp-sekcja { display: flex; flex-direction: column; gap: 6px; }
 .kp-etykieta {
-  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;
-  color: var(--muted); display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;
+  color: var(--muted); display: flex; align-items: center; gap: 8px;
 }
-.kp-chipy { display: flex; flex-wrap: wrap; gap: 4px; }
-.kp-chipy .kod-chip { cursor: pointer; padding: 5px 9px; border: 1.5px solid transparent; }
+.kp-chipy { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.kp-chipy .kod-chip {
+  cursor: pointer; padding: 7px 2px; border: 1.5px solid transparent; text-align: center;
+  min-width: 0; font-size: 12.5px;
+}
 .kp-chipy .kod-chip:hover { filter: brightness(0.95); }
 .kp-chipy .kod-chip.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
 .kp-reset {

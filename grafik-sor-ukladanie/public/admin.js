@@ -673,7 +673,7 @@ function onOtworzPicker(ev) {
   render();
 
   let left = td.offsetLeft;
-  const maxLeft = kontener.clientWidth + kontener.scrollLeft - 262;
+  const maxLeft = kontener.clientWidth + kontener.scrollLeft - 344;
   if (left > maxLeft) left = Math.max(0, maxLeft);
   picker.style.left = left + 'px';
   picker.style.top = (td.offsetTop + td.offsetHeight + 4) + 'px';
