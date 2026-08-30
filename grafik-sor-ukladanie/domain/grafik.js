@@ -272,7 +272,7 @@ const DOMYSLNE_PARAMETRY = {
 const GRF_KATALOG_REGUL = [
   { id: 'W1', waga: 'hard', opis: 'Zmiana niemożliwa w dniu zatwierdzonej nieobecności (i uwaga o Nn - nieobecności nieusprawiedliwionej).' },
   { id: 'W2', waga: 'hard', opis: 'Maksymalnie jedna zmiana dziennie (D+N tego samego dnia tylko jako DOBA).' },
-  { id: 'W3', waga: 'hard/soft', opis: 'Odpoczynek dobowy min. 11 h (po nocce, po dobie) - hard dla etatu, soft dla pozostałych form.' },
+  { id: 'W3', waga: 'hard', opis: 'Odpoczynek dobowy min. 11 h - zakaz dniówki/doby zaraz po nocce - hard dla WSZYSTKICH form zatrudnienia.' },
   { id: 'W4', waga: 'soft', opis: 'Odpoczynek tygodniowy min. 35 h nieprzerwanie (etat).' },
   { id: 'W5', waga: 'soft', opis: 'Norma czasu pracy 2-miesięcznego okresu rozliczeniowego (etat).' },
   { id: 'W6', waga: 'hard/soft', opis: 'Limit 48 h/tydzień - hard bez zgody opt-out, soft ze zgodą.' },
@@ -422,15 +422,21 @@ function blokada(pracownik, data, kod, wpisy, parametry) {
   }
 
   // W3 - odpoczynek dobowy >= 11 h (praktycznie: po N nie D/DOBA tego samego dnia po niej;
-  // przed N nie może już stać D następnego dnia). Twarda dla etatu, w innym wypadku
-  // sygnalizowana jako miękka w ostrzezeniaMiesiaca().
+  // przed N nie może już stać D następnego dnia). TWARDA DLA WSZYSTKICH form
+  // zatrudnienia (nie tylko etatu) - poprawione 2026-08-30 na wyraźną prośbę
+  // Piotra ("po nocy nie może być dzień od razu" - wcześniej blokowało tylko
+  // etat, dla kontraktu/zlecenia było tylko miękkim ostrzeżeniem w
+  // ostrzezeniaMiesiaca(), co uznał za błąd). Uwaga: W19 (zakaz N po N) - dodane
+  // wcześniej tego samego dnia na podstawie błędnie odczytanej prośby - zostało
+  // WYCOFANE (Piotr potwierdził, że nie taka była intencja).
+  if (grfRegulaAktywna(parametry, 'W3') && (kod === 'D' || kod === 'DOBA') && wczoraj === 'N') {
+    return 'W3 - po nocce (kończy się 07:00) odpoczynek 11 h; najwcześniej dniówka o 19:00 (art. 97 UoDL).';
+  }
+  if (grfRegulaAktywna(parametry, 'W3') && kod === 'N' && jutro === 'D') {
+    return 'W3 - nazajutrz zaplanowana dniówka; odpoczynek 11 h nie zostanie zachowany (art. 97 UoDL).';
+  }
+
   if (pracownik.forma === 'etat') {
-    if (grfRegulaAktywna(parametry, 'W3') && (kod === 'D' || kod === 'DOBA') && wczoraj === 'N') {
-      return 'W3 - po nocce (kończy się 07:00) odpoczynek 11 h; najwcześniej dniówka o 19:00 (art. 97 UoDL).';
-    }
-    if (grfRegulaAktywna(parametry, 'W3') && kod === 'N' && jutro === 'D') {
-      return 'W3 - nazajutrz zaplanowana dniówka; odpoczynek 11 h nie zostanie zachowany (art. 97 UoDL).';
-    }
     // W7 - po DOBIE (24 h) odpoczynek: bezpośrednio po niej nie D/DOBA (analogicznie do W3)
     if (grfRegulaAktywna(parametry, 'W7') && (kod === 'D' || kod === 'DOBA') && wczoraj === 'DOBA') {
       return 'W7 - po dyżurze DOBA wymagany odpoczynek co najmniej równy przepracowanym godzinom (art. 95/97 UoDL).';
@@ -676,10 +682,11 @@ function ostrzezeniaMiesiaca(wpisy, pracownicy, rok, miesiac, parametry, wpisyRo
       var kod = grfGlownyKod(indeks, p.id, data);
       var jutro = grfGlownyKod(indeks, p.id, dodajDni(data, 1));
 
-      // W3 wykryte w istniejących danych (np. po imporcie z Excela) - hard dla etatu, soft dla reszty
+      // W3 wykryte w istniejących danych (np. po imporcie z Excela) - HARD dla
+      // WSZYSTKICH form zatrudnienia (poprawione 2026-08-30, zgodnie z blokada() wyżej).
       if (kod === 'N' && (jutro === 'D' || jutro === 'DOBA')) {
         out.push({
-          sev: p.forma === 'etat' ? 'hard' : 'soft', rule: 'W3', pracownikId: p.id, data: dodajDni(data, 1),
+          sev: 'hard', rule: 'W3', pracownikId: p.id, data: dodajDni(data, 1),
           komunikat: 'Dniówka nazajutrz po nocce - odpoczynek dobowy poniżej 11 h.',
         });
       }
