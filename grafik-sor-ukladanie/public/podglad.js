@@ -157,7 +157,11 @@ async function pokazGrafik() {
 
   if (!dane.opublikowany) {
     ostatnieDane = null;
-    tresc.innerHTML = '<div class="card"><p class="note" style="font-style:italic">Grafik na ' + miesiac + '.' + rok + ' nie został jeszcze opublikowany.</p></div>';
+    // Dopisane 2026-08-30 ("nie widzę opublikowanego grafiku") - najczęstsza
+    // przyczyna to po prostu inny miesiąc/rok niż ten, który układający
+    // opublikował, więc jawna podpowiedź, żeby sprawdzić pola Rok/Miesiąc wyżej.
+    tresc.innerHTML = '<div class="card"><p class="note" style="font-style:italic">Grafik na ' + miesiac + '.' + rok + ' nie został jeszcze opublikowany.</p>' +
+      '<p class="note">Sprawdź, czy wybrany jest właściwy rok i miesiąc (pola wyżej) - grafik mógł zostać opublikowany na inny okres.</p></div>';
     return;
   }
 

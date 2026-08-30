@@ -31,7 +31,10 @@
     <button type="button" class="nav-item" data-view="warn"><i class="ti ti-alert-triangle"></i>Ostrzeżenia<span class="badge-count" id="nav-warn-count" style="display:none">0</span></button>
     <button type="button" class="nav-item" data-view="ustawienia"><i class="ti ti-settings"></i>Ustawienia</button>
     <div class="spacer"></div>
-    <a class="nav-item" href="podglad.html" target="_blank"><i class="ti ti-external-link"></i>Podgląd publiczny</a>
+    <!-- Przełącznik na widok personelu - BEZ target="_blank" (2026-08-30, na
+         życzenie: "nie mam przełączenia pomiędzy admin a personel"), żeby to było
+         zwykłe przejście w tej samej karcie, nie ciche otwarcie nowej karty. -->
+    <a class="nav-item" href="podglad.html"><i class="ti ti-calendar"></i>Podgląd (personel)</a>
     <button type="button" class="nav-item" id="btn-wyloguj"><i class="ti ti-logout"></i>Wyloguj</button>
   </div>
 

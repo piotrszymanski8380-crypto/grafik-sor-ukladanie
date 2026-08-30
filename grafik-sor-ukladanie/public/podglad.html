@@ -12,7 +12,14 @@
   <div class="card row no-print">
     <h1 style="margin:0">Grafik SOR — podgląd</h1>
     <span style="flex:1"></span>
-    <a href="index.html"><i class="ti ti-arrow-left"></i> strona główna</a>
+    <!-- Przełącznik podgląd/admin (2026-08-30, na życzenie: "nie mam przełączenia
+         pomiędzy admin a personel") - ten sam wygląd co grupa-toggle w admin.html,
+         żeby dało się jednym klikiem, w tej samej karcie, przejść między widokami. -->
+    <div class="segmented">
+      <button type="button" class="active" disabled><i class="ti ti-calendar"></i> Podgląd</button>
+      <a class="btn-jak-segment" href="admin.html"><i class="ti ti-lock"></i> Panel administratora</a>
+    </div>
+    <a href="index.html" style="margin-left:12px"><i class="ti ti-arrow-left"></i> strona główna</a>
   </div>
 
   <div class="card row no-print">

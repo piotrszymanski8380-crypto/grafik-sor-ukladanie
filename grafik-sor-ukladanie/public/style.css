@@ -119,6 +119,15 @@ label { font-size: 13px; color: var(--muted); display: flex; align-items: center
   color: var(--muted); cursor: pointer;
 }
 .segmented button.active { background: var(--panel); color: var(--text); box-shadow: var(--shadow); font-weight: 600; }
+.segmented button:disabled { cursor: default; }
+/* .btn-jak-segment - link (<a>) stylizowany jak przycisk .segmented, do przełącznika
+   podgląd/panel administratora (patrz podglad.html/admin.html) - "segmented" jest
+   pomyślany pod <button>, ale tu jeden z "przycisków" to zwykły link między stronami. */
+.segmented .btn-jak-segment {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 6px;
+  font-size: 13px; color: var(--muted); text-decoration: none;
+}
+.segmented .btn-jak-segment:hover { background: var(--panel); color: var(--text); text-decoration: none; }
 
 /* ---------- siatka grafiku ---------- */
 /* Przeprojektowane 2026-08-30 (feedback: "powinna być możliwość widać cały mc
