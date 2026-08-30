@@ -116,6 +116,7 @@ async function wystartuj() {
   await wczytajPracownikow();
   await wczytajGrafik();
   await wczytajStatusPodgladu();
+  await wczytajReguly();
 }
 
 // ============================================================================
@@ -144,6 +145,45 @@ document.getElementById('form-haslo-admina').addEventListener('submit', async (e
     document.getElementById('form-haslo-admina').reset();
   } catch (e) {
     pokazMsg('admin-haslo-msg', e.dane && e.dane.error ? e.dane.error : 'Błąd zmiany hasła.', 'err');
+  }
+});
+
+// ============================================================================
+// USTAWIENIA — reguły grafiku (W1-W17), włącz/wyłącz per reguła
+// ============================================================================
+let katalogRegul = [];
+let wylaczoneReguly = [];
+
+async function wczytajReguly() {
+  const dane = await api('/api/reguly');
+  katalogRegul = dane.katalog || [];
+  wylaczoneReguly = dane.wylaczoneReguly || [];
+  renderReguly();
+}
+
+function renderReguly() {
+  const wrap = document.getElementById('reguly-lista');
+  wrap.innerHTML = katalogRegul.map((r) => {
+    const wylaczona = wylaczoneReguly.indexOf(r.id) !== -1;
+    return '<label class="regula-wiersz' + (wylaczona ? ' wylaczona' : '') + '">' +
+      '<input type="checkbox" class="regula-check" data-id="' + r.id + '"' + (wylaczona ? '' : ' checked') + '>' +
+      '<span class="regula-id">' + r.id + '</span>' +
+      '<span class="regula-waga waga-' + r.waga.replace('/', '-') + '">' + r.waga + '</span>' +
+      '<span class="regula-opis">' + r.opis + '</span>' +
+      '</label>';
+  }).join('');
+}
+
+document.getElementById('btn-zapisz-reguly').addEventListener('click', async () => {
+  const nowaLista = Array.from(document.querySelectorAll('.regula-check')).filter((c) => !c.checked).map((c) => c.dataset.id);
+  try {
+    await api('/api/reguly', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ wylaczoneReguly: nowaLista }) });
+    wylaczoneReguly = nowaLista;
+    renderReguly();
+    pokazMsg('reguly-msg', 'Zapisano ustawienia reguł.', 'ok');
+    await wczytajGrafik(); // odśwież ostrzeżenia/obsadę wg nowego zestawu aktywnych reguł
+  } catch (e) {
+    pokazMsg('reguly-msg', e.dane && e.dane.error ? e.dane.error : 'Błąd zapisu.', 'err');
   }
 });
 
@@ -680,9 +720,10 @@ function onOtworzPicker(ev) {
   }
 
   async function zapisz(pole, staraWartosc) {
-    if (!pending.kod) {
-      // brak planu = pusta komórka, realizacja/zamiana bez planu nie mają sensu
-      pending.kodRealizacji = '';
+    // Realizacja MOŻE być ustawiona bez planu (nieplanowany dyżur faktycznie
+    // przepracowany - grfKodEfektywny() i tak liczy godziny/reguły wg realizacji).
+    // Zamiana bez żadnego kodu (ani planu, ani realizacji) nie ma jednak sensu.
+    if (!pending.kod && !pending.kodRealizacji) {
       pending.zamianaZId = '';
     }
     const ok = await zapiszKomorke(pracownikId, dataX, pending);

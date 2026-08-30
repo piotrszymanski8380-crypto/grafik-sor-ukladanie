@@ -243,6 +243,25 @@ table.obsada { border-collapse: collapse; width: 100%; font-size: 12px; }
 table.obsada th, table.obsada td { border-bottom: 1px solid var(--border); padding: 6px 8px; text-align: center; }
 table.obsada td.brak { background: var(--hard-bg); color: var(--hard); font-weight: 700; border-radius: 6px; }
 
+/* ---------- reguły grafiku (Ustawienia -> Reguły) ---------- */
+.regula-wiersz {
+  display: flex; align-items: flex-start; gap: 10px; padding: 8px 4px;
+  border-bottom: 1px solid var(--border); cursor: pointer;
+}
+.regula-wiersz:last-child { border-bottom: none; }
+.regula-wiersz:hover { background: var(--bg); }
+.regula-wiersz.wylaczona { opacity: 0.55; }
+.regula-wiersz input { margin-top: 3px; flex-shrink: 0; }
+.regula-id { font-weight: 700; min-width: 32px; font-size: 12.5px; flex-shrink: 0; }
+.regula-waga {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;
+  padding: 2px 7px; border-radius: 8px; white-space: nowrap; flex-shrink: 0; align-self: center;
+}
+.regula-waga.waga-hard { background: var(--hard-bg); color: var(--hard); }
+.regula-waga.waga-soft { background: var(--soft-bg); color: var(--soft); }
+.regula-waga.waga-hard-soft { background: var(--accent-bg); color: var(--accent-text); }
+.regula-opis { flex: 1; font-size: 12.5px; color: var(--text); }
+
 /* ---------- login ---------- */
 .login-shell { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); }
 .login-box { width: 320px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 28px; box-shadow: var(--shadow); }
