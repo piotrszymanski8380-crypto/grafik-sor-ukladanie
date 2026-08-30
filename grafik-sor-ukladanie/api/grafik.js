@@ -73,7 +73,14 @@ module.exports = async function handler(req, res) {
 
   if (req.method === 'GET') {
     const stanBiezacy = await wczytajStan(rok, miesiac);
-    const admin = czyAdmin(req);
+    // widok=podglad - wymuszony przez public/podglad.js (2026-08-30, na życzenie:
+    // "dalej w podglad personelu nie widze grafiku"). Bez tego admin przeglądający
+    // podglad.html WCIĄŻ ma ciasteczko sesji admina, więc czyAdmin(req) było true
+    // i serwer zwracał gałąź "admin" (bez pola opublikowany) - podgląd zawsze
+    // pokazywał "nie opublikowano", niezależnie od faktycznego statusu. Panel
+    // admina samego siebie o ten parametr nie pyta, więc zachowuje się jak dawniej.
+    const wymuszonyPodglad = req.query && (req.query.widok === 'podglad');
+    const admin = !wymuszonyPodglad && czyAdmin(req);
 
     if (!admin) {
       if (!(await mozePodgladac(req))) {
