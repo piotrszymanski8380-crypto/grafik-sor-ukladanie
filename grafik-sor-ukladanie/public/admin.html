@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>Grafik SOR — panel administratora</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="login-widok" class="login-shell" style="display:none">
+  <div class="login-box">
+    <h1>Panel administratora</h1>
+    <p class="subtitle">Zaloguj się, żeby układać i publikować grafik.</p>
+    <form id="login-form">
+      <div class="row" style="flex-direction:column; align-items:stretch">
+        <input type="password" id="login-haslo" placeholder="Hasło administratora" autofocus>
+        <button class="btn" type="submit">Zaloguj</button>
+      </div>
+    </form>
+    <div id="login-msg"></div>
+    <p class="note" style="margin-top:14px"><a href="index.html">← strona główna</a></p>
+  </div>
+</div>
+
+<div id="app-widok" class="app-shell" style="display:none">
+  <div class="sidebar no-print">
+    <div class="brand">Grafik SOR</div>
+    <button type="button" class="nav-item active" data-view="grafik"><i class="ti ti-calendar"></i>Grafik</button>
+    <button type="button" class="nav-item" data-view="kadra"><i class="ti ti-users"></i>Kadra</button>
+    <button type="button" class="nav-item" data-view="warn"><i class="ti ti-alert-triangle"></i>Ostrzeżenia<span class="badge-count" id="nav-warn-count" style="display:none">0</span></button>
+    <button type="button" class="nav-item" data-view="ustawienia"><i class="ti ti-settings"></i>Ustawienia</button>
+    <div class="spacer"></div>
+    <a class="nav-item" href="podglad.html" target="_blank"><i class="ti ti-external-link"></i>Podgląd publiczny</a>
+    <button type="button" class="nav-item" id="btn-wyloguj"><i class="ti ti-logout"></i>Wyloguj</button>
+  </div>
+
+  <div class="content">
+    <div class="card no-print" style="margin-bottom:16px">
+      <div class="row gap-lg">
+        <label>Rok: <input type="number" id="pole-rok" style="width:80px"></label>
+        <label>Miesiąc: <select id="pole-miesiac"></select></label>
+        <button class="btn secondary sm" id="btn-wczytaj">Wczytaj</button>
+        <span style="flex:1"></span>
+        <span class="row" style="gap:6px"><span class="note">Status:</span> <span id="status-badge" class="badge roboczy">—</span></span>
+        <span id="status-wersja" class="note"></span>
+        <button class="btn sm" id="btn-publikuj">Publikuj</button>
+        <button class="btn secondary sm" id="btn-wznow" style="display:none">Wznów edycję</button>
+      </div>
+      <div id="publikuj-msg"></div>
+    </div>
+
+    <!-- ============ WIDOK: GRAFIK ============ -->
+    <div class="view active" data-view-content="grafik">
+      <div class="card">
+        <div class="content-header">
+          <h2 style="margin:0">Siatka grafiku</h2>
+          <div class="segmented grupa-toggle no-print">
+            <button type="button" class="active" data-grupa="main">Pielęgniarki / ratownicy</button>
+            <button type="button" data-grupa="opie">Opiekunowie</button>
+          </div>
+          <span style="flex:1"></span>
+          <div class="row no-print">
+            <button class="btn secondary sm" id="btn-generuj"><i class="ti ti-wand"></i> Generuj brakujące</button>
+            <button class="btn secondary sm" id="btn-drukuj"><i class="ti ti-printer"></i> Drukuj / PDF</button>
+            <button class="btn secondary sm" id="btn-eksport-excel"><i class="ti ti-download"></i> Eksport Excel</button>
+          </div>
+        </div>
+        <div id="generuj-msg" class="no-print"></div>
+        <div class="grid-scroll">
+          <table class="grid" id="grafik-table-main"></table>
+          <table class="grid" id="grafik-table-opie" style="display:none"></table>
+          <div class="kod-picker no-print" id="kod-picker"></div>
+        </div>
+        <div class="legend no-print">
+          <span><span class="dot" style="background:var(--role-d-text)"></span>D — dniówka 12h</span>
+          <span><span class="dot" style="background:var(--role-n-text)"></span>N — nocka 12h</span>
+          <span><span class="dot" style="background:var(--role-doba-text)"></span>DOBA — 24h</span>
+          <span><span class="dot" style="background:var(--muted)"></span>W — wolne</span>
+          <span><span class="dot" style="background:var(--role-uw-text)"></span>UW — urlop</span>
+          <span><span class="dot" style="background:var(--role-ch-text)"></span>CH/DCH/NCH — chorobowe</span>
+          <span>🩺 starszy asystent pielęgniarstwa</span>
+          <span style="margin-left:auto">kliknij komórkę, żeby zmienić kod</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Obsada dzienna</h3>
+        <div id="obsada-wrap"></div>
+      </div>
+    </div>
+
+    <!-- ============ WIDOK: KADRA ============ -->
+    <div class="view" data-view-content="kadra">
+      <div class="card">
+        <div class="content-header">
+          <h2 style="margin:0">Kadra oddziału</h2>
+          <div class="segmented grupa-toggle no-print">
+            <button type="button" class="active" data-grupa="main">Pielęgniarki / ratownicy</button>
+            <button type="button" data-grupa="opie">Opiekunowie</button>
+          </div>
+        </div>
+        <p class="note">Prawdziwe imiona i nazwiska wpisujesz tutaj, w działającej appce — nigdy w kodzie
+        źródłowym. Pole „stanowisko" w main to pielęgniarka/ratownik, w opie — opiekun medyczny/opiekun
+        pacjenta (podgrupa, dziś tylko zapisywana, w przyszłości może wpływać na układanie grafiku). Pola
+        SAP/Bez nocek/Opt-out 48h dotyczą tylko main. Pola „Godz. min/max" dotyczą osób na zlecenie/kontrakt
+        — appka ostrzeże (reguła W15), jeśli suma godzin w danym miesiącu wypadnie poza ten zakres (dla etatu
+        pola te są nieaktywne). Kolumny „Dzień/Noc/Tylko dzień/Doba" dotyczą tylko opie — uprawnienia do
+        rodzaju dyżuru (można zaznaczyć kilka naraz), dziś tylko zapisywane.</p>
+        <p class="note">Możesz wgrać listę z pliku Excel/CSV — rozpoznawane kolumny (nazwy elastyczne,
+        wielkość liter bez znaczenia, obsługiwany też dwuwierszowy nagłówek grupa+podgrupa): <b>Imię i
+        nazwisko</b>, <b>Forma zatrudnienia</b>, <b>Wymiar etatu</b>, <b>Grupa</b> (main/opie — albo
+        „opiekun medyczny"/„opiekun pacjenta"), <b>Stanowisko</b>, <b>min łącznie</b>/<b>max łącznie</b>,
+        <b>SAP</b>, <b>Bez nocek</b>, <b>Opt-out 48h</b> (tylko main), <b>Dzień</b>, <b>Noc</b>, <b>Tylko
+        dzień</b>, <b>Doba</b> (tylko opie). Osoby o tym samym imieniu i nazwisku zostaną zaktualizowane,
+        nowe — dodane. Po wgraniu sprawdź listę i kliknij „Zapisz listę".</p>
+
+        <div class="grid-scroll">
+          <table class="staff" id="tabela-pracownicy-main">
+            <thead><tr>
+              <th>Imię i nazwisko</th><th>Forma</th><th>Etat</th><th>Grupa</th>
+              <th>Stanowisko</th><th>Godz. min</th><th>Godz. max</th>
+              <th>SW limit</th><th>Op limit</th>
+              <th>SAP 🩺</th><th>Bez nocek</th><th>Opt-out 48h</th><th></th>
+            </tr></thead>
+            <tbody id="tabela-pracownicy-main-body"></tbody>
+          </table>
+          <table class="staff" id="tabela-pracownicy-opie" style="display:none">
+            <thead><tr>
+              <th>Imię i nazwisko</th><th>Forma</th><th>Etat</th><th>Grupa</th>
+              <th>Stanowisko</th><th>Godz. min</th><th>Godz. max</th>
+              <th>SW limit</th><th>Op limit</th>
+              <th>Dzień</th><th>Noc</th><th>Tylko dzień</th><th>Doba</th><th></th>
+            </tr></thead>
+            <tbody id="tabela-pracownicy-opie-body"></tbody>
+          </table>
+        </div>
+        <div class="row no-print" style="margin-top:12px">
+          <button class="btn secondary sm" id="btn-dodaj-pracownika"><i class="ti ti-plus"></i> Dodaj pracownika</button>
+          <button class="btn secondary sm" id="btn-wgraj-plik"><i class="ti ti-file"></i> Wgraj z pliku (Excel/CSV)</button>
+          <input type="file" id="input-plik-kadra" accept=".xlsx,.xls,.csv" style="display:none">
+          <button class="btn sm" id="btn-zapisz-pracownikow">Zapisz listę</button>
+        </div>
+        <div id="pracownicy-msg"></div>
+      </div>
+    </div>
+
+    <!-- ============ WIDOK: OSTRZEŻENIA ============ -->
+    <div class="view" data-view-content="warn">
+      <div class="card">
+        <h2>Ostrzeżenia — <span id="warn-miesiac-etykieta"></span></h2>
+        <ul class="warn-list" id="warn-list"></ul>
+      </div>
+    </div>
+
+    <!-- ============ WIDOK: USTAWIENIA ============ -->
+    <div class="view" data-view-content="ustawienia">
+      <div class="card">
+        <h2>Hasło administratora</h2>
+        <form id="form-haslo-admina">
+          <div class="row" style="flex-direction:column; align-items:stretch; gap:8px; max-width:320px">
+            <input type="password" id="admin-obecne" placeholder="Obecne hasło" autocomplete="current-password">
+            <input type="password" id="admin-nowe" placeholder="Nowe hasło" autocomplete="new-password">
+            <input type="password" id="admin-nowe2" placeholder="Powtórz nowe hasło" autocomplete="new-password">
+            <button class="btn sm" type="submit" style="align-self:flex-start">Zmień hasło</button>
+          </div>
+        </form>
+        <div id="admin-haslo-msg"></div>
+      </div>
+      <div class="card">
+        <h2>Hasło dostępu do podglądu</h2>
+        <p class="note">Obecnie: <b id="podglad-status">—</b>. Puste pole i zapis = podgląd bez hasła (otwarty dla każdego z linkiem).</p>
+        <form id="form-haslo-podgladu">
+          <div class="row" style="flex-direction:column; align-items:stretch; gap:8px; max-width:320px">
+            <input type="password" id="podglad-nowe" placeholder="Nowe hasło podglądu (puste = wyłącz)" autocomplete="new-password">
+            <button class="btn sm" type="submit" style="align-self:flex-start">Zapisz</button>
+          </div>
+        </form>
+        <div id="podglad-haslo-msg"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>

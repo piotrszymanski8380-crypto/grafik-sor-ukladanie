@@ -1,0 +1,255 @@
+/* style.css — nowy design system (v2): boczna nawigacja, karty, kolorowe
+   tło komórek per kod dyżuru (nie tylko kolor tekstu jak w v1) - zatwierdzone
+   z Piotrem na makiecie przed budową. */
+
+:root {
+  --bg: #f5f6f8;
+  --panel: #ffffff;
+  --border: #e2e5ea;
+  --border-strong: #cbd0d8;
+  --text: #1a1d23;
+  --muted: #6b7280;
+  --accent: #2f5fdb;
+  --accent-bg: #e8eefc;
+  --accent-text: #1d4bb8;
+
+  --role-d-bg: #e0ebfb; --role-d-text: #1d4ed8;
+  --role-n-bg: #ece7fb; --role-n-text: #6d28d9;
+  --role-doba-bg: #fdf0d9; --role-doba-text: #b45309;
+  --role-w-bg: #eef0f3; --role-w-text: #6b7280;
+  --role-uw-bg: #dff5ea; --role-uw-text: #067a49;
+  --role-ch-bg: #fbe4e4; --role-ch-text: #c22222;
+  --role-s-bg: #eef0f3; --role-s-text: #6b7280;
+
+  --hard: #c22222;
+  --hard-bg: #fbe4e4;
+  --soft: #b45309;
+  --soft-bg: #fdf0d9;
+  --ok-bg: #dff5ea;
+  --ok-text: #067a49;
+
+  --radius: 8px;
+  --radius-lg: 12px;
+  --shadow: 0 1px 2px rgba(20, 24, 33, 0.06);
+  --shadow-md: 0 4px 16px rgba(20, 24, 33, 0.12);
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+h1 { font-size: 19px; font-weight: 600; margin: 0; }
+h2 { font-size: 15px; font-weight: 600; margin: 0 0 12px; }
+h3 { font-size: 13px; font-weight: 600; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.02em; }
+p { margin: 0 0 8px; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ---------- layout: boczna nawigacja + treść ---------- */
+.app-shell { display: flex; min-height: 100vh; }
+.sidebar {
+  width: 200px; flex-shrink: 0; background: var(--panel);
+  border-right: 1px solid var(--border); padding: 16px 10px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.sidebar .brand { font-weight: 600; font-size: 15px; padding: 4px 10px 18px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px; padding: 9px 10px;
+  border-radius: var(--radius); color: var(--muted); cursor: pointer;
+  border: none; background: none; font-size: 13.5px; text-align: left; width: 100%;
+}
+.nav-item:hover { background: var(--bg); color: var(--text); }
+.nav-item.active { background: var(--accent-bg); color: var(--accent-text); font-weight: 600; }
+.nav-item .badge-count {
+  margin-left: auto; background: var(--hard-bg); color: var(--hard);
+  font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px;
+}
+.sidebar .spacer { flex: 1; }
+.sidebar .foot { padding: 10px; font-size: 12px; color: var(--muted); }
+
+.content { flex: 1; min-width: 0; padding: 20px 24px 60px; }
+.content-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.view { display: none; }
+.view.active { display: block; }
+
+/* ---------- karty ---------- */
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 18px; margin-bottom: 16px; box-shadow: var(--shadow); }
+.card-flat { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 0; margin-bottom: 16px; overflow: hidden; }
+
+/* ---------- przyciski / pola ---------- */
+button { font-family: inherit; }
+.btn {
+  background: var(--accent); color: #fff; border: none; border-radius: var(--radius);
+  padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.btn:hover { filter: brightness(1.06); }
+.btn:disabled { background: #cbd0d8; cursor: not-allowed; }
+.btn.secondary { background: var(--panel); color: var(--text); border: 1px solid var(--border-strong); }
+.btn.secondary:hover { background: var(--bg); }
+.btn.danger { background: var(--hard); }
+.btn.sm { padding: 5px 10px; font-size: 12px; }
+.icon-btn { background: none; border: none; cursor: pointer; color: var(--muted); padding: 4px; border-radius: 6px; }
+.icon-btn:hover { background: var(--bg); color: var(--text); }
+
+input[type=text], input[type=number], input[type=password], input[type=file], select, textarea {
+  font-family: inherit; font-size: 13px; padding: 7px 9px; border: 1px solid var(--border-strong);
+  border-radius: var(--radius); background: var(--panel); color: var(--text);
+}
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-bg); border-color: var(--accent); }
+label { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row.gap-lg { gap: 16px; }
+
+/* ---------- badge / status ---------- */
+.badge { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 10px; }
+.badge.roboczy { background: var(--accent-bg); color: var(--accent-text); }
+.badge.opublikowany { background: var(--ok-bg); color: var(--ok-text); }
+
+/* ---------- segmented control (main/opie) ---------- */
+.segmented { display: inline-flex; background: var(--bg); border-radius: var(--radius); padding: 2px; gap: 2px; }
+.segmented button {
+  border: none; background: none; padding: 6px 14px; border-radius: 6px; font-size: 13px;
+  color: var(--muted); cursor: pointer;
+}
+.segmented button.active { background: var(--panel); color: var(--text); box-shadow: var(--shadow); font-weight: 600; }
+
+/* ---------- siatka grafiku ---------- */
+.grid-scroll { overflow-x: auto; }
+table.grid { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+table.grid th, table.grid td { padding: 0; text-align: center; border-bottom: 1px solid var(--border); }
+table.grid thead th {
+  padding: 9px 6px; font-weight: 500; color: var(--muted); background: var(--panel);
+  position: sticky; top: 0; z-index: 2; white-space: nowrap;
+}
+table.grid thead th.weekend { background: var(--soft-bg); color: var(--soft); }
+table.grid td.nazwa, table.grid th.nazwa {
+  position: sticky; left: 0; background: var(--panel); z-index: 3; text-align: left;
+  padding: 8px 12px; white-space: nowrap; font-weight: 600; border-right: 1px solid var(--border);
+}
+table.grid tbody tr:hover td { background: var(--bg); }
+table.grid tbody tr:hover td.nazwa { background: var(--bg); }
+table.grid td.dzien {
+  padding: 4px; cursor: pointer; min-width: 46px;
+  display: table-cell; vertical-align: middle;
+}
+/* przeciąganie dyżuru na inny dzień (w obrębie tej samej osoby) */
+table.grid td.dzien[draggable="true"] { cursor: grab; }
+table.grid td.dzien.dragging { opacity: 0.35; }
+table.grid td.dzien.drag-over { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-bg); }
+table.grid td.dzien > * { display: block; margin: 0 auto 2px; }
+table.grid td.dzien > *:last-child { margin-bottom: 0; }
+.kod-chip {
+  display: inline-block; min-width: 34px; padding: 4px 0; border-radius: 6px;
+  font-weight: 600; color: var(--muted);
+}
+/* realizacja (drugi „wiersz" w komórce, jeśli inna niż plan — wzorem płachty) */
+.kod-chip.small { min-width: 26px; padding: 2px 0; font-size: 10px; opacity: 0.85; }
+/* adnotacja „z kim zamiana" (imię/nazwisko partnera zamiany) */
+.zamiana-note {
+  font-size: 9px; color: var(--accent-text); font-weight: 600; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 44px;
+  margin: 0 auto;
+}
+.kod-chip.k-D { background: var(--role-d-bg); color: var(--role-d-text); }
+.kod-chip.k-N { background: var(--role-n-bg); color: var(--role-n-text); }
+.kod-chip.k-DOBA { background: var(--role-doba-bg); color: var(--role-doba-text); font-size: 10.5px; }
+.kod-chip.k-W, .kod-chip.k-Wn, .kod-chip.k-Ws { background: transparent; color: var(--muted); font-weight: 400; }
+/* UW i pozostałe "usprawiedliwione nieobecności" liczone jak UW (patrz
+   GRF_KODY_WG_STAWKI_OSOBY w domain/grafik.js) - wspólna rodzina kolorystyczna,
+   żeby siatka była czytelna mimo dużej liczby kodów (dopisane 2026-08-30). */
+.kod-chip.k-UW, .kod-chip.k-SW, .kod-chip.k-Op, .kod-chip.k-Us, .kod-chip.k-Uo,
+.kod-chip.k-Ub, .kod-chip.k-Um, .kod-chip.k-Nun, .kod-chip.k-Nup, .kod-chip.k-Zr {
+  background: var(--role-uw-bg); color: var(--role-uw-text); font-size: 10.5px;
+}
+.kod-chip.k-CH, .kod-chip.k-DCH, .kod-chip.k-NCH { background: var(--role-ch-bg); color: var(--role-ch-text); font-size: 10.5px; }
+.kod-chip.k-S { background: var(--role-s-bg); color: var(--role-s-text); }
+.kod-chip.k-Nz { background: var(--role-w-bg); color: var(--role-w-text); }
+/* Nn - nieobecność NIEusprawiedliwiona - celowo w rodzinie "twardej" (jak CH), żeby
+   rzucała się w oczy i wymagała wyjaśnienia. */
+.kod-chip.k-Nn { background: var(--hard-bg); color: var(--hard); font-size: 10.5px; }
+
+/* ---------- popover edycji komórki (Plan / Realizacja / Zamiana z) ---------- */
+.grid-scroll { position: relative; }
+.kod-picker {
+  position: absolute; display: none; flex-direction: column; gap: 8px; width: 260px;
+  background: var(--panel); border: 1px solid var(--border-strong); border-radius: var(--radius);
+  box-shadow: var(--shadow-md); padding: 10px; z-index: 20;
+}
+.kod-picker.open { display: flex; }
+.kp-sekcja { display: flex; flex-direction: column; gap: 5px; }
+.kp-etykieta {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;
+  color: var(--muted); display: flex; align-items: center; gap: 6px;
+}
+.kp-chipy { display: flex; flex-wrap: wrap; gap: 4px; }
+.kp-chipy .kod-chip { cursor: pointer; padding: 5px 9px; border: 1.5px solid transparent; }
+.kp-chipy .kod-chip:hover { filter: brightness(0.95); }
+.kp-chipy .kod-chip.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.kp-reset {
+  background: none; border: none; color: var(--accent); font-size: 10.5px; font-weight: 600;
+  cursor: pointer; padding: 0; text-transform: none; letter-spacing: 0;
+}
+.kp-reset:hover { text-decoration: underline; }
+.kp-zamiana { width: 100%; }
+.kp-akcje { display: flex; justify-content: flex-end; padding-top: 2px; border-top: 1px solid var(--border); }
+
+/* ---------- legenda ---------- */
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 10px; }
+.legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+
+/* ---------- tabela pracowników ---------- */
+table.staff { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+table.staff th, table.staff td { padding: 7px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+table.staff thead th { color: var(--muted); font-weight: 500; background: var(--bg); }
+table.staff td input, table.staff td select { width: 100%; }
+
+/* ---------- lista ostrzeżeń ---------- */
+ul.warn-list { list-style: none; margin: 0; padding: 0; }
+ul.warn-list li { padding: 10px 12px; border-radius: var(--radius); margin-bottom: 8px; font-size: 13px; border-left: 3px solid transparent; }
+ul.warn-list li.hard { background: var(--hard-bg); border-left-color: var(--hard); }
+ul.warn-list li.soft { background: var(--soft-bg); border-left-color: var(--soft); }
+ul.warn-list li b { display: block; font-size: 12px; margin-bottom: 2px; }
+ul.warn-list .empty { color: var(--muted); font-style: italic; padding: 12px 0; }
+
+/* ---------- obsada ---------- */
+table.obsada { border-collapse: collapse; width: 100%; font-size: 12px; }
+table.obsada th, table.obsada td { border-bottom: 1px solid var(--border); padding: 6px 8px; text-align: center; }
+table.obsada td.brak { background: var(--hard-bg); color: var(--hard); font-weight: 700; border-radius: 6px; }
+
+/* ---------- login ---------- */
+.login-shell { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); }
+.login-box { width: 320px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 28px; box-shadow: var(--shadow); }
+.login-box h1 { margin-bottom: 4px; }
+.login-box .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+
+.msg { font-size: 13px; padding: 9px 12px; border-radius: var(--radius); margin-top: 10px; }
+.msg.err { background: var(--hard-bg); color: var(--hard); }
+.msg.ok { background: var(--ok-bg); color: var(--ok-text); }
+.note { font-size: 12px; color: var(--muted); }
+
+/* ---------- print ---------- */
+@media print {
+  body { background: #fff; }
+  .no-print { display: none !important; }
+  .app-shell { display: block; }
+  .sidebar { display: none; }
+  .content { padding: 0; }
+  .card { border: none; box-shadow: none; padding: 0; }
+  table.grid { font-size: 9px; }
+  table.grid td.nazwa, table.grid th.nazwa, table.grid thead th { position: static; }
+  @page { size: landscape; margin: 10mm; }
+}
+
+@media (max-width: 820px) {
+  .app-shell { flex-direction: column; }
+  .sidebar { width: 100%; flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--border); }
+  .sidebar .brand, .sidebar .spacer, .sidebar .foot { display: none; }
+  .content { padding: 14px; }
+}

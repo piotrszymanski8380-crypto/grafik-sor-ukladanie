@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>Grafik SOR — podgląd</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div style="max-width:1100px; margin:0 auto; padding:20px 20px 60px">
+  <div class="card row no-print">
+    <h1 style="margin:0">Grafik SOR — podgląd</h1>
+    <span style="flex:1"></span>
+    <a href="index.html"><i class="ti ti-arrow-left"></i> strona główna</a>
+  </div>
+
+  <div class="card row no-print">
+    <label>Rok: <input type="number" id="pole-rok" style="width:80px"></label>
+    <label>Miesiąc: <select id="pole-miesiac"></select></label>
+    <button class="btn sm" id="btn-wczytaj">Pokaż</button>
+    <span style="flex:1"></span>
+    <button class="btn secondary sm" id="btn-drukuj"><i class="ti ti-printer"></i> Drukuj / PDF</button>
+    <button class="btn secondary sm" id="btn-eksport-excel"><i class="ti ti-download"></i> Eksport Excel</button>
+  </div>
+
+  <div id="tresc"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="podglad.js"></script>
+</body>
+</html>
