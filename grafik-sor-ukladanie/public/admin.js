@@ -287,6 +287,10 @@ function wierszPracownika(p, pokazPolaMain) {
     '<td><select class="p-op-jednostka" title="Jednostka rocznego limitu opieki nad dzieckiem (Op)"' + (p.forma !== 'etat' ? ' disabled' : '') + '>' +
       '<option value="dni"' + (p.opiekaJednostka !== 'godziny' ? ' selected' : '') + '>Op: dni</option>' +
       '<option value="godziny"' + (p.opiekaJednostka === 'godziny' ? ' selected' : '') + '>Op: godz.</option></select></td>' +
+    // Zgoda na mniejszą liczbę dyżurów/nocek niż reszta zespołu - wyklucza osobę
+    // z reguły W18 (sprawiedliwy rozkład dyżurów, patrz domain/grafik.js), tak jak
+    // "bez_nocek"/"tylko_dzien" - wspólna kolumna dla obu grup (dopisane 2026-08-30).
+    '<td style="text-align:center"><input type="checkbox" class="p-mniej-nocek" title="Wyklucza z reguły W18 (sprawiedliwy rozkład dyżurów)"' + (flagi.indexOf('zgoda_mniej_nocek') !== -1 ? ' checked' : '') + '></td>' +
     (pokazPolaMain
       ? '<td style="text-align:center"><input type="checkbox" class="p-sap"' + (flagi.indexOf('starszy_asystent') !== -1 ? ' checked' : '') + '></td>' +
         '<td style="text-align:center"><input type="checkbox" class="p-beznocek"' + (flagi.indexOf('bez_nocek') !== -1 ? ' checked' : '') + '></td>' +
@@ -340,8 +344,10 @@ document.getElementById('btn-zapisz-pracownikow').addEventListener('click', asyn
     const polSap = tr.querySelector('.p-sap');
     const polBeznocek = tr.querySelector('.p-beznocek');
     const polOptout = tr.querySelector('.p-optout');
+    const polMniejNocek = tr.querySelector('.p-mniej-nocek');
     if (polSap && polSap.checked) flagi.push('starszy_asystent');
     if (polBeznocek && polBeznocek.checked) flagi.push('bez_nocek');
+    if (polMniejNocek && polMniejNocek.checked) flagi.push('zgoda_mniej_nocek');
     const typyDyzuru = [];
     const polDzien = tr.querySelector('.p-dyzur-dzien');
     const polNoc = tr.querySelector('.p-dyzur-noc');
