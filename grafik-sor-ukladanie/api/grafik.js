@@ -194,6 +194,35 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    if (akcja === 'importMasowy') {
+      // Import GOTOWEGO grafiku z realnego arkusza Excela (public/admin.js parsuje
+      // plik przez XLSX + domain/importGrafikuExcel.js, PO ekranie dopasowania
+      // nazwisk) - NADPISUJE cały miesiąc naraz, bez przechodzenia przez blokada()
+      // (dane historyczne, patrz komentarz przy sgImportujMiesiac w domain/
+      // stanGrafiku.js - appka wychwyci ewentualne złamane reguły jako zwykłe
+      // Ostrzeżenia PO imporcie, nie blokuje samego wgrania).
+      const { wpisy: noweWpisy, opis } = req.body;
+      if (!Array.isArray(noweWpisy)) {
+        res.status(400).json({ error: 'Wymagana tablica "wpisy".' });
+        return;
+      }
+      const nieznani = noweWpisy.filter((w) => !pracownicy.some((p) => p.id === w.pracownikId));
+      if (nieznani.length > 0) {
+        res.status(400).json({ error: 'Import zawiera nieznane id pracownika: ' + nieznani.slice(0, 3).map((w) => w.pracownikId).join(', ') + (nieznani.length > 3 ? '…' : '') });
+        return;
+      }
+      let nowyStan;
+      try {
+        nowyStan = stanGrafiku.sgImportujMiesiac(stanBiezacy, noweWpisy, 'admin', opis);
+      } catch (e) {
+        res.status(409).json({ error: e.message });
+        return;
+      }
+      await writeJSON(kluczGrafiku(rok, miesiac), nowyStan);
+      res.status(200).json({ ok: true, stan: nowyStan });
+      return;
+    }
+
     if (akcja === 'wznowEdycje') {
       const nowyStan = stanGrafiku.sgWznowEdycje(stanBiezacy, 'admin', req.body.kontekst || 'wznowienie edycji');
       await writeJSON(kluczGrafiku(rok, miesiac), nowyStan);
