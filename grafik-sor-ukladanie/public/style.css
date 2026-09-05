@@ -82,6 +82,11 @@ a:hover { text-decoration: underline; }
 .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 18px; margin-bottom: 16px; box-shadow: var(--shadow); }
 .card-flat { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 0; margin-bottom: 16px; overflow: hidden; }
 
+/* ---------- modal (dziś tylko ekran dopasowania nazwisk przy imporcie grafiku
+   z Excela - admin.js, import*()/api/grafik-import.js) ---------- */
+.modal-overlay { position: fixed; inset: 0; background: rgba(20, 24, 33, 0.45); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 24px; }
+.modal-box { max-width: 720px; width: 100%; max-height: 86vh; overflow-y: auto; margin-bottom: 0; }
+
 /* ---------- przyciski / pola ---------- */
 button { font-family: inherit; }
 .btn {

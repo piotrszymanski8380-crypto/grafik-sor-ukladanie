@@ -65,6 +65,8 @@
           <span style="flex:1"></span>
           <div class="row no-print">
             <button class="btn secondary sm" id="btn-generuj"><i class="ti ti-wand"></i> Generuj brakujące</button>
+            <button class="btn secondary sm" id="btn-import-excel"><i class="ti ti-upload"></i> Wgraj grafik z pliku (Excel)</button>
+            <input type="file" id="input-plik-grafiku" accept=".xlsx,.xls" style="display:none">
             <button class="btn secondary sm" id="btn-drukuj"><i class="ti ti-printer"></i> Drukuj / PDF</button>
             <button class="btn secondary sm" id="btn-eksport-excel"><i class="ti ti-download"></i> Eksport Excel</button>
           </div>
@@ -182,6 +184,20 @@
         </div>
         <div id="reguly-msg"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Ekran dopasowania nazwisk przy imporcie grafiku z Excela (public/admin.js,
+     funkcje import*() - patrz api/grafik-import.js). Statyczny szkielet, treść
+     budowana dynamicznie w importRenderEkran(). -->
+<div id="import-grafiku-modal" class="modal-overlay no-print" style="display:none">
+  <div class="modal-box card">
+    <h2 style="margin-top:0">Import grafiku z pliku Excel — dopasowanie nazwisk</h2>
+    <div id="import-grafiku-tresc"></div>
+    <div class="row" style="margin-top:16px; justify-content:flex-end">
+      <button class="btn secondary sm" id="btn-import-anuluj">Anuluj</button>
+      <button class="btn sm" id="btn-import-zatwierdz">Zatwierdź import</button>
     </div>
   </div>
 </div>

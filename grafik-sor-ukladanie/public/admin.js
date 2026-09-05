@@ -7,11 +7,11 @@
 // patrz komentarz przy GRF_KODY_WG_STAWKI_OSOBY w domain/grafik.js.
 const KODY = [
   '', 'D', 'N', 'DOBA', 'W', 'UW', 'CH', 'DCH', 'NCH', 'S',
-  'SW', 'Op', 'Us', 'Uo', 'Ub', 'Um', 'Nn', 'Nun', 'Nup', 'Zr', 'Wn', 'Ws',
+  'SW', 'Op', 'Us', 'Uo', 'Ub', 'Um', 'Nn', 'Nun', 'Nup', 'Zr', 'Wn', 'Ws', 'OJCO',
 ];
 const ETYKIETY_KODOW = {
   '': '—', D: 'D', N: 'N', DOBA: 'DOBA', W: 'W', UW: 'UW', CH: 'CH', DCH: 'DCH', NCH: 'NCH', S: 'S',
-  SW: 'SW', Op: 'Op', Us: 'Us', Uo: 'Uo', Ub: 'Ub', Um: 'Um', Nn: 'Nn', Nun: 'Nun', Nup: 'Nup', Zr: 'Zr', Wn: 'Wn', Ws: 'Ws',
+  SW: 'SW', Op: 'Op', Us: 'Us', Uo: 'Uo', Ub: 'Ub', Um: 'Um', Nn: 'Nn', Nun: 'Nun', Nup: 'Nup', Zr: 'Zr', Wn: 'Wn', Ws: 'Ws', OJCO: 'OJCO',
 };
 // Podpowiedzi (title="...") w pickerze - żeby "Uo"/"Zr" itp. nie były zagadką.
 const OPISY_KODOW = {
@@ -23,6 +23,7 @@ const OPISY_KODOW = {
   Nn: 'nieobecność NIEusprawiedliwiona', Nun: 'nieobecność usprawiedliwiona niepłatna',
   Nup: 'nieobecność usprawiedliwiona płatna', Zr: 'zasiłek rehabilitacyjny',
   Wn: 'odbiór za pracę w niedzielę/święto', Ws: 'odbiór za pracę w sobotę',
+  OJCO: 'urlop ojcowski',
 };
 const NAZWY_MIESIECY = ['styczeń','luty','marzec','kwiecień','maj','czerwiec','lipiec','sierpień','wrzesień','październik','listopad','grudzień'];
 
@@ -913,6 +914,135 @@ document.getElementById('btn-wznow').addEventListener('click', async () => {
   const wynik = await api('/api/grafik', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rok, miesiac, akcja: 'wznowEdycje' }) });
   pokazMsg('publikuj-msg', 'Wznowiono edycję (wersja ' + wynik.stan.wersja + ').', 'ok');
   await wczytajGrafik();
+});
+
+// ============================================================================
+// IMPORT GOTOWEGO GRAFIKU Z EXCELA (2026-09-05, na prośbę Piotra: "nie ma
+// możliwości eksportowania grafiku z Excela" - w domyśle: WCZYTANIA realnego,
+// historycznego arkusza typu "płachta_2026.xlsx" do appki). Klient tu robi
+// TYLKO jedną rzecz - wyciąga surową siatkę komórek z wybranego arkusza przez
+// bibliotekę XLSX (już załadowaną wyżej, jak przy imporcie kadry) - CAŁA
+// normalizacja kodów i dopasowanie nazwisk dzieje się na serwerze
+// (api/grafik-import.js + domain/importGrafikuExcel.js + domain/
+// importDopasowania.js), żeby appka nie musiała utrzymywać tej samej,
+// nietrywialnej logiki w dwóch miejscach (przeglądarka i serwer).
+// Dwuetapowo: akcja='parsuj' (serwer zwraca dopasowania do przejrzenia) ->
+// ekran w #import-grafiku-modal -> akcja='zatwierdz' (serwer zapisuje).
+// ============================================================================
+
+let importStanRoboczy = null; // { main: {wierszeOsob, pominieciOsob, dopasowania}|null, opie: {...}|null }
+
+function siatkaZArkusza(arkusz) {
+  if (!arkusz) return null;
+  return XLSX.utils.sheet_to_json(arkusz, { header: 1, raw: true, defval: null });
+}
+
+function importIdWyboru(grupaKlucz, nazwisko) {
+  return 'import-wybor-' + grupaKlucz + '-' + encodeURIComponent(nazwisko);
+}
+
+function importWierszDopasowania(dopasowanie, grupaKlucz) {
+  const nazwisko = dopasowanie.nazwisko;
+  if (dopasowanie.wynik === 'dokladne') {
+    return '<div class="regula-wiersz"><b>' + nazwisko + '</b> — dopasowano automatycznie do istniejącego pracownika.</div>';
+  }
+  const opcjePomin = '<option value="">— pomiń tę osobę' + (dopasowanie.wynik === 'brak' ? ' (brak dopasowania)' : '') + ' —</option>';
+  const opcjeKandydaci = dopasowanie.wynik === 'kandydaci'
+    ? dopasowanie.kandydaci.map((k) => '<option value="' + k.id + '">' + k.nazwisko + ' (podobieństwo ' + k.podobienstwo + ')</option>').join('')
+    : '';
+  return '<div class="regula-wiersz"><b>' + nazwisko + '</b> — ' +
+    (dopasowanie.wynik === 'kandydaci' ? 'nazwisko z Excela, wybierz kogo to dotyczy:' : 'nazwisko nie pasuje do nikogo w kadrze:') +
+    '<br><select id="' + importIdWyboru(grupaKlucz, nazwisko) + '">' + opcjePomin + opcjeKandydaci + '</select></div>';
+}
+
+function importRenderEkran() {
+  const tresc = document.getElementById('import-grafiku-tresc');
+  let html = '<p class="note">Import NIE tworzy nowych pracowników — nazwiska bez wybranego dopasowania zostaną pominięte przy zapisie (dodaj brakującą osobę w Kadrze i wgraj plik ponownie, jeśli trzeba jej dyżury).</p>';
+  const etykietyGrup = { main: 'Pielęgniarki / ratownicy', opie: 'Opiekunowie' };
+  ['main', 'opie'].forEach((grupaKlucz) => {
+    const dane = importStanRoboczy[grupaKlucz];
+    if (!dane) return;
+    html += '<h3 style="margin:16px 0 8px">' + etykietyGrup[grupaKlucz] + '</h3>';
+    if (dane.pominieciOsob && dane.pominieciOsob.length) {
+      html += '<p class="note">Pominięte przy odczycie arkusza: ' +
+        dane.pominieciOsob.map((p) => p.nazwisko + ' (' + p.powod + ')').join('; ') + '</p>';
+    }
+    if (!dane.dopasowania.length) {
+      html += '<p class="note">Brak osób do zaimportowania w tym arkuszu.</p>';
+    } else {
+      html += dane.dopasowania.map((d) => importWierszDopasowania(d, grupaKlucz)).join('');
+    }
+  });
+  tresc.innerHTML = html;
+}
+
+document.getElementById('btn-import-excel').addEventListener('click', () => {
+  document.getElementById('input-plik-grafiku').click();
+});
+
+document.getElementById('input-plik-grafiku').addEventListener('change', async (ev) => {
+  const plik = ev.target.files[0];
+  if (!plik) return;
+  try {
+    const bufor = await plik.arrayBuffer();
+    const skoroszyt = XLSX.read(bufor, { type: 'array' });
+    const nazwaMiesiaca = NAZWY_MIESIECY[miesiac - 1];
+    const arkuszMain = skoroszyt.Sheets[nazwaMiesiaca];
+    const arkuszOpie = skoroszyt.Sheets['Opie-' + nazwaMiesiaca];
+    if (!arkuszMain && !arkuszOpie) {
+      alert('W pliku nie ma arkusza „' + nazwaMiesiaca + '" ani „Opie-' + nazwaMiesiaca + '" — sprawdź, czy u góry wybrany jest właściwy Rok/Miesiąc (import wczytuje arkusz DOKŁADNIE dla wybranego miesiąca).');
+      return;
+    }
+    const wynik = await api('/api/grafik-import', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rok, miesiac, akcja: 'parsuj', main: siatkaZArkusza(arkuszMain), opie: siatkaZArkusza(arkuszOpie) }),
+    });
+    if ((wynik.main && wynik.main.blad) || (wynik.opie && wynik.opie.blad)) {
+      alert('Nie udało się odczytać arkusza: ' + ((wynik.main && wynik.main.blad) || (wynik.opie && wynik.opie.blad)));
+      return;
+    }
+    importStanRoboczy = { main: wynik.main, opie: wynik.opie };
+    importRenderEkran();
+    document.getElementById('import-grafiku-modal').style.display = 'flex';
+  } catch (e) {
+    alert('Błąd wczytywania pliku: ' + (e.dane && e.dane.error ? e.dane.error : e.message));
+  }
+  ev.target.value = '';
+});
+
+document.getElementById('btn-import-anuluj').addEventListener('click', () => {
+  document.getElementById('import-grafiku-modal').style.display = 'none';
+  importStanRoboczy = null;
+});
+
+document.getElementById('btn-import-zatwierdz').addEventListener('click', async () => {
+  const body = { rok, miesiac, akcja: 'zatwierdz' };
+  ['main', 'opie'].forEach((grupaKlucz) => {
+    const dane = importStanRoboczy[grupaKlucz];
+    if (!dane) return;
+    const przypisania = {};
+    dane.dopasowania.forEach((d) => {
+      if (d.wynik === 'dokladne') { przypisania[d.nazwisko] = d.id; return; }
+      const select = document.getElementById(importIdWyboru(grupaKlucz, d.nazwisko));
+      if (select && select.value) przypisania[d.nazwisko] = select.value;
+    });
+    body[grupaKlucz] = { wierszeOsob: dane.wierszeOsob, przypisania };
+  });
+  try {
+    const wynik = await api('/api/grafik-import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    document.getElementById('import-grafiku-modal').style.display = 'none';
+    importStanRoboczy = null;
+    let tekst = 'Zaimportowano ' + wynik.liczbaWpisow + ' ' + (wynik.liczbaWpisow === 1 ? 'wpis' : 'wpisów') + '.';
+    if (wynik.doSprawdzenia && wynik.doSprawdzenia.length) {
+      tekst += ' Do ręcznego sprawdzenia (' + wynik.doSprawdzenia.length + '): ' +
+        wynik.doSprawdzenia.slice(0, 20).map((d) => (d.nazwisko || '?') + (d.data ? ' ' + d.data : '') + ' — ' + d.powod).join('; ') +
+        (wynik.doSprawdzenia.length > 20 ? '…' : '');
+    }
+    pokazMsg('generuj-msg', tekst, wynik.doSprawdzenia && wynik.doSprawdzenia.length ? 'err' : 'ok');
+    await wczytajGrafik();
+  } catch (e) {
+    alert('Błąd zapisu importu: ' + (e.dane && e.dane.error ? e.dane.error : e.message));
+  }
 });
 
 // ---- generator brakującej obsady ----
