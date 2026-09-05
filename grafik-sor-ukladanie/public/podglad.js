@@ -3,7 +3,7 @@
 const NAZWY_MIESIECY = ['styczeń','luty','marzec','kwiecień','maj','czerwiec','lipiec','sierpień','wrzesień','październik','listopad','grudzień'];
 const ETYKIETY_KODOW = {
   '': '—', D: 'D', N: 'N', DOBA: 'DOBA', W: 'W', UW: 'UW', CH: 'CH', DCH: 'DCH', NCH: 'NCH', S: 'S',
-  SW: 'SW', Op: 'Op', Us: 'Us', Uo: 'Uo', Ub: 'Ub', Um: 'Um', Nn: 'Nn', Nun: 'Nun', Nup: 'Nup', Zr: 'Zr', Wn: 'Wn', Ws: 'Ws', OJCO: 'OJCO',
+  SW: 'SW', Op: 'Op', Us: 'Us', Uo: 'Uo', Ub: 'Ub', Um: 'Um', Nn: 'Nn', Nun: 'Nun', Nup: 'Nup', Zr: 'Zr', Wn: 'Wn', Ws: 'Ws', OJCO: 'OJCO', ODDZ: 'ODDZ',
 };
 const OPISY_KODOW = {
   D: 'dyżur 12h - dzień', N: 'dyżur 12h - noc', DOBA: 'dyżur 24h', W: 'wolne',
@@ -13,6 +13,7 @@ const OPISY_KODOW = {
   Nn: 'nieobecność NIEusprawiedliwiona', Nun: 'nieobecność usprawiedliwiona niepłatna',
   Nup: 'nieobecność usprawiedliwiona płatna', Zr: 'zasiłek rehabilitacyjny',
   Wn: 'odbiór za niedzielę/święto', Ws: 'odbiór za sobotę', OJCO: 'urlop ojcowski',
+  ODDZ: 'godziny administracyjne (nie liczy się do obsady)',
 };
 
 function liczbaDniMiesiaca(r, m) { return new Date(r, m, 0).getDate(); }

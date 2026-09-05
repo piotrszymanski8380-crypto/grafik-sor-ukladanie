@@ -7,11 +7,11 @@
 // patrz komentarz przy GRF_KODY_WG_STAWKI_OSOBY w domain/grafik.js.
 const KODY = [
   '', 'D', 'N', 'DOBA', 'W', 'UW', 'CH', 'DCH', 'NCH', 'S',
-  'SW', 'Op', 'Us', 'Uo', 'Ub', 'Um', 'Nn', 'Nun', 'Nup', 'Zr', 'Wn', 'Ws', 'OJCO',
+  'SW', 'Op', 'Us', 'Uo', 'Ub', 'Um', 'Nn', 'Nun', 'Nup', 'Zr', 'Wn', 'Ws', 'OJCO', 'ODDZ',
 ];
 const ETYKIETY_KODOW = {
   '': '—', D: 'D', N: 'N', DOBA: 'DOBA', W: 'W', UW: 'UW', CH: 'CH', DCH: 'DCH', NCH: 'NCH', S: 'S',
-  SW: 'SW', Op: 'Op', Us: 'Us', Uo: 'Uo', Ub: 'Ub', Um: 'Um', Nn: 'Nn', Nun: 'Nun', Nup: 'Nup', Zr: 'Zr', Wn: 'Wn', Ws: 'Ws', OJCO: 'OJCO',
+  SW: 'SW', Op: 'Op', Us: 'Us', Uo: 'Uo', Ub: 'Ub', Um: 'Um', Nn: 'Nn', Nun: 'Nun', Nup: 'Nup', Zr: 'Zr', Wn: 'Wn', Ws: 'Ws', OJCO: 'OJCO', ODDZ: 'ODDZ',
 };
 // Podpowiedzi (title="...") w pickerze - żeby "Uo"/"Zr" itp. nie były zagadką.
 const OPISY_KODOW = {
@@ -24,6 +24,7 @@ const OPISY_KODOW = {
   Nup: 'nieobecność usprawiedliwiona płatna', Zr: 'zasiłek rehabilitacyjny',
   Wn: 'odbiór za pracę w niedzielę/święto', Ws: 'odbiór za pracę w sobotę',
   OJCO: 'urlop ojcowski',
+  ODDZ: 'godziny administracyjne (oddziałowa/oddziałowy) - nie liczy się do obsady',
 };
 const NAZWY_MIESIECY = ['styczeń','luty','marzec','kwiecień','maj','czerwiec','lipiec','sierpień','wrzesień','październik','listopad','grudzień'];
 
