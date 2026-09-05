@@ -50,19 +50,48 @@
 //                      zdarzają się"), próg 0.8, w przeciwnym razie do ręcznego
 //                      sprawdzenia.
 //   wiersz osoby, w którym komórki dni to LICZBY 0-1 (ułamek doby - czas typu
-//      "7:35" zapisany jako wartość Excela) zamiast kodów tekstowych -> CAŁA
-//      osoba pomijana przy imporcie (Piotr: "Szymański to ja, oddziałowy, pracuję
-//      7:00-14:35, to nie dyżury D/N/DOBA") - patrz iwzWykryjWierszGodzinowy.
+//      "7:35" zapisany jako wartość Excela) zamiast kodów tekstowych -> osoba
+//      spoza D/N/DOBA (Piotr: "Szymański to ja, oddziałowy, pracuję 7:00-14:35,
+//      to nie dyżury D/N/DOBA") - patrz iwzWykryjWierszGodzinowy. Piotr potwierdził
+//      2026-09-05: taka osoba MA być wpisana do grafiku ("ja też muszę być
+//      wpisany"), ale NIE liczy się do obsady - stąd nowy kod ODDZ (patrz
+//      domain/grafik.js), a same godziny (zmienne dzień po dniu) trafiają do
+//      notatki wpisu, appka ich nigdzie nie sumuje.
 
 // ---------- krok 1: znalezienie wiersza "Data" i kolumn dni ----------
 
-/** Wiersz (indeks 0-based w `grid`), w którego kolumnie A jest dosłownie "Data". */
+/**
+ * Wiersz (indeks 0-based w `grid`), w którym gdzieś w pierwszych kolumnach jest
+ * dosłownie "Data". UWAGA: arkusze "main" mają etykietę w kolumnie A (indeks 0),
+ * ale arkusze "Opie-<miesiąc>" mają CAŁĄ siatkę przesuniętą o jedną kolumnę
+ * w prawo (kolumna A jest zawsze pusta, "Data" i dane osób zaczynają się w
+ * kolumnie B / indeks 1) - dlatego szukamy w kilku pierwszych kolumnach, nie
+ * tylko w kolumnie 0. Patrz też iwzZnajdzKolumneEtykiety() niżej.
+ */
 function iwzZnajdzWierszDanych(grid) {
   for (var r = 0; r < grid.length; r++) {
     var wiersz = grid[r];
-    if (wiersz && String(wiersz[0] == null ? '' : wiersz[0]).trim() === 'Data') return r;
+    if (!wiersz) continue;
+    for (var c = 0; c < Math.min(wiersz.length, 10); c++) {
+      if (String(wiersz[c] == null ? '' : wiersz[c]).trim() === 'Data') return r;
+    }
   }
   return -1;
+}
+
+/**
+ * Kolumna (indeks 0-based), w której w wierszu `wierszDanych` znajduje się
+ * dosłownie "Data" - to jest też kolumna, w której leżą nazwiska osób w
+ * kolejnych wierszach (main: kolumna 0, Opie-<miesiąc>: kolumna 1 - patrz
+ * komentarz w iwzZnajdzWierszDanych). Wywoływać tylko gdy iwzZnajdzWierszDanych
+ * zwróciło wynik != -1 dla tego samego grid.
+ */
+function iwzZnajdzKolumneEtykiety(grid, wierszDanych) {
+  var wiersz = (grid && grid[wierszDanych]) || [];
+  for (var c = 0; c < Math.min(wiersz.length, 10); c++) {
+    if (String(wiersz[c] == null ? '' : wiersz[c]).trim() === 'Data') return c;
+  }
+  return 0;
 }
 
 /**
@@ -116,6 +145,19 @@ function iwzWykryjWierszGodzinowy(wartosciDni) {
     if (typeof v === 'string' && v.trim() !== '' && v.trim() !== '0') maKodTekstowy = true;
   });
   return maUlamekGodziny && !maKodTekstowy;
+}
+
+/**
+ * iwzFormatujGodziny(ulamekDoby) -> "H:MM"
+ * Zamienia ułamek doby (np. 0.31597... = 7:35, tak jak SheetJS zwraca komórki typu
+ * "godzina" przy {raw:true}) na czytelny tekst do notatki wpisu ODDZ (patrz niżej) -
+ * appka NIE sumuje tych godzin do żadnej reguły, to czysto informacyjny zapis.
+ */
+function iwzFormatujGodziny(ulamekDoby) {
+  var minuty = Math.round(ulamekDoby * 24 * 60);
+  var h = Math.floor(minuty / 60);
+  var m = minuty % 60;
+  return h + ':' + String(m).padStart(2, '0');
 }
 
 // ---------- krok 3: normalizacja pojedynczej komórki kodu (row1) ----------
@@ -236,6 +278,9 @@ function iwzParsujArkusz(grid) {
   if (kolumnyDni.length === 0) {
     return { nazwiska: [], wierszeOsob: [], pominieciOsob: [], blad: 'Wiersz "Data" nie zawiera rozpoznawalnej sekwencji dni 1..N.' };
   }
+  // Kolumna z nazwiskami osób = ta sama kolumna, w której jest etykieta "Data"
+  // (main: kolumna A/0, Opie-<miesiąc>: kolumna B/1 - patrz iwzZnajdzKolumneEtykiety).
+  var kolumnaEtykiety = iwzZnajdzKolumneEtykiety(grid, wierszDanych);
 
   var nazwiska = [];
   var wierszeOsob = [];
@@ -243,42 +288,71 @@ function iwzParsujArkusz(grid) {
 
   var r = wierszDanych + 1;
   while (r < grid.length) {
-    var etykieta = grid[r] && grid[r][0];
+    var etykieta = grid[r] && grid[r][kolumnaEtykiety];
     if (etykieta == null || String(etykieta).trim() === '') { r++; continue; }
     var nazwisko = String(etykieta).trim();
     var wierszKod = grid[r] || [];
     var wierszNotatka = grid[r + 1] || [];
 
     var wartosciDni = kolumnyDni.map(function (c) { return wierszKod[c]; });
-    if (iwzWykryjWierszGodzinowy(wartosciDni)) {
-      pominieciOsob.push({ nazwisko: nazwisko, powod: 'wiersz zawiera godziny (np. czas pracy oddziałowej) zamiast kodów D/N/DOBA - pominięto przy imporcie grafiku.' });
-      r += 2;
-      continue;
-    }
+    var jestGodzinowy = iwzWykryjWierszGodzinowy(wartosciDni);
 
     var dni = [];
-    kolumnyDni.forEach(function (c, i) {
-      var znormalizowany = iwzNormalizujKod(wierszKod[c]);
-      var notatkaRaw = wierszNotatka[c];
-      var notatka = (notatkaRaw != null && String(notatkaRaw).trim() !== '') ? String(notatkaRaw).trim() : '';
-      if (!znormalizowany) {
-        if (notatka) dni.push({ dzien: i + 1, kod: '', notatka: notatka, liczySieDoObsady: true, doSprawdzenia: false });
-        return;
-      }
-      var wpisDnia = {
-        dzien: i + 1,
-        kod: znormalizowany.kod,
-        liczySieDoObsady: znormalizowany.liczySieDoObsady,
-        doSprawdzenia: !!znormalizowany.doSprawdzenia,
-        powod: znormalizowany.powod,
-        zamianaSurowa: znormalizowany.zamianaSurowa,
-        notatka: [znormalizowany.notatkaDodatkowa, notatka].filter(Boolean).join(' / '),
-      };
-      dni.push(wpisDnia);
-    });
+    if (jestGodzinowy) {
+      // Osoba spoza D/N/DOBA (np. oddziałowa/oddziałowy - "Szymański Piotr", stałe
+      // godziny 7:00-14:35) - Piotr potwierdził 2026-09-05: TAKA osoba MA być
+      // widoczna w grafiku ("ja też muszę być wpisany"), ale jej godziny NIE są
+      // dyżurem SOR i NIE liczą się do obsady - stąd kod ODDZ (patrz domain/
+      // grafik.js: celowo poza GRF_KODY_ZMIANY/GRF_KODY_NIEOBECNOSC/GRF_KODY_WG_
+      // STAWKI_OSOBY, więc żadna reguła W2/W3/W6/W7/W10/W1 się nie uruchamia, a
+      // obsadaDnia/obsadaPielegniarekDnia liczą tylko D/N/DOBA - ODDZ nigdy nie
+      // pasuje). Same godziny (zmienne, z arkusza) trafiają do notatki - appka ich
+      // nie sumuje do żadnej reguły czasu pracy.
+      kolumnyDni.forEach(function (c, i) {
+        var v = wierszKod[c];
+        var notatkaRaw = wierszNotatka[c];
+        var notatkaOryg = (notatkaRaw != null && String(notatkaRaw).trim() !== '') ? String(notatkaRaw).trim() : '';
+        if (v == null || v === '' || v === 0) {
+          if (notatkaOryg) dni.push({ dzien: i + 1, kod: '', notatka: notatkaOryg, liczySieDoObsady: false, doSprawdzenia: false });
+          return;
+        }
+        if (typeof v === 'number' && v > 0 && v < 1) {
+          dni.push({
+            dzien: i + 1, kod: 'ODDZ', liczySieDoObsady: false, doSprawdzenia: false,
+            notatka: [iwzFormatujGodziny(v) + ' godz. administracyjne', notatkaOryg].filter(Boolean).join(' / '),
+          });
+          return;
+        }
+        dni.push({
+          dzien: i + 1, kod: null, liczySieDoObsady: false, doSprawdzenia: true,
+          powod: 'wiersz godzinowy (administracyjny), nierozpoznana wartość komórki: "' + v + '"',
+          notatka: notatkaOryg,
+        });
+      });
+    } else {
+      kolumnyDni.forEach(function (c, i) {
+        var znormalizowany = iwzNormalizujKod(wierszKod[c]);
+        var notatkaRaw = wierszNotatka[c];
+        var notatka = (notatkaRaw != null && String(notatkaRaw).trim() !== '') ? String(notatkaRaw).trim() : '';
+        if (!znormalizowany) {
+          if (notatka) dni.push({ dzien: i + 1, kod: '', notatka: notatka, liczySieDoObsady: true, doSprawdzenia: false });
+          return;
+        }
+        var wpisDnia = {
+          dzien: i + 1,
+          kod: znormalizowany.kod,
+          liczySieDoObsady: znormalizowany.liczySieDoObsady,
+          doSprawdzenia: !!znormalizowany.doSprawdzenia,
+          powod: znormalizowany.powod,
+          zamianaSurowa: znormalizowany.zamianaSurowa,
+          notatka: [znormalizowany.notatkaDodatkowa, notatka].filter(Boolean).join(' / '),
+        };
+        dni.push(wpisDnia);
+      });
+    }
 
     if (nazwiska.indexOf(nazwisko) === -1) nazwiska.push(nazwisko);
-    wierszeOsob.push({ nazwisko: nazwisko, dni: dni });
+    wierszeOsob.push({ nazwisko: nazwisko, dni: dni, godzinowy: jestGodzinowy || undefined });
     r += 2;
   }
 
@@ -433,8 +507,10 @@ function iwzZbudujWpisy(wierszeOsob, przypisaniaNazwisk, pracownicy, rok, miesia
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     iwzZnajdzWierszDanych: iwzZnajdzWierszDanych,
+    iwzZnajdzKolumneEtykiety: iwzZnajdzKolumneEtykiety,
     iwzKolumnyDni: iwzKolumnyDni,
     iwzWykryjWierszGodzinowy: iwzWykryjWierszGodzinowy,
+    iwzFormatujGodziny: iwzFormatujGodziny,
     iwzNormalizujKod: iwzNormalizujKod,
     iwzParsujArkusz: iwzParsujArkusz,
     iwzPodobienstwoTokenow: iwzPodobienstwoTokenow,

@@ -83,6 +83,16 @@ const GRF_GODZ_KOD = {
   // przepracowania (nie jest usprawiedliwiona - art. 130 §3 KP jej nie dotyczy) -
   // dlatego generuje osobne, twarde do zauważenia ostrzeżenie w ostrzezeniaMiesiaca().
   Nn: 0,
+  // ODDZ - godziny administracyjne oddziałowej/oddziałowego (np. Szymański Piotr,
+  // 7:00-14:35 stałych godzin) - dopisane 2026-09-05 przy imporcie realnego arkusza:
+  // takie osoby MUSZĄ być widoczne w grafiku (Piotr: "ja też muszę być wpisany"),
+  // ale ich godziny NIE są dyżurem SOR i CELOWO nie są w GRF_KODY_ZMIANY (więc W2/
+  // W3/W6/W7/W10 ich nie dotyczą) ani w GRF_KODY_NIEOBECNOSC (to nie nieobecność)
+  // ani w GRF_KODY_WG_STAWKI_OSOBY - stąd 0h tutaj i "nie liczy się do obsady" przez
+  // obsadaDnia()/obsadaPielegniarekDnia() (liczą tylko D/N/DOBA, ODDZ nigdy nie
+  // pasuje). Rzeczywista liczba przepracowanych godzin (zmienna, z arkusza) trafia
+  // do notatki wpisu (patrz domain/importGrafikuExcel.js), appka jej nie sumuje.
+  ODDZ: 0,
 };
 // Kody liczone wg indywidualnej stawki dziennej osoby (normaDobowaH x etat), nie
 // wartością stałą z GRF_GODZ_KOD - patrz godzinyKodu(kod, etat). To WSZYSTKIE
