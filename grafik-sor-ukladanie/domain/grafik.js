@@ -110,9 +110,12 @@ const GRF_GODZ_KOD = {
 //        konkretny kod nie pasuje)
 //   Nup - nieobecność usprawiedliwiona płatna (jw.)
 //   Zr - zasiłek rehabilitacyjny
+// OJCO - urlop ojcowski (art. 182(3) KP, do 2 lat dziecka) - dopisane 2026-09-05
+// przy imporcie realnego arkusza "płachta_2026.xlsx" (kod tam już używany przez
+// Piotra), liczony jak reszta nieobecności wg indywidualnej stawki osoby.
 const GRF_KODY_WG_STAWKI_OSOBY = [
   'UW', 'CH', 'DCH', 'NCH',
-  'SW', 'Op', 'Us', 'Uo', 'Ub', 'Um', 'Nun', 'Nup', 'Zr',
+  'SW', 'Op', 'Us', 'Uo', 'Ub', 'Um', 'Nun', 'Nup', 'Zr', 'OJCO',
 ];
 
 // kody traktowane jako "zmiana robocza" na potrzeby W2/W3/W7/W10
@@ -123,7 +126,7 @@ const GRF_KODY_ZMIANY = ['D', 'N', 'DOBA'];
 // GRF_GODZ_KOD) - to nadal "coś już tu jest zapisane" z punktu widzenia W1.
 const GRF_KODY_NIEOBECNOSC = [
   'UW', 'CH', 'DCH', 'NCH', 'Nz',
-  'SW', 'Op', 'Us', 'Uo', 'Ub', 'Um', 'Nn', 'Nun', 'Nup', 'Zr',
+  'SW', 'Op', 'Us', 'Uo', 'Ub', 'Um', 'Nn', 'Nun', 'Nup', 'Zr', 'OJCO',
 ];
 
 function grfJestZmiana(kod) { return GRF_KODY_ZMIANY.indexOf(kod) !== -1; }
@@ -498,11 +501,16 @@ function minimalnaObsada(grupa, typZmiany, data, parametry) {
   return tabela[okres][typZmiany] || 0;
 }
 
+// `w.liczySieDoObsady === false` (dopisane 2026-09-05, import z Excela - patrz
+// domain/importGrafikuExcel.js) wyklucza wpis z liczenia obsady (W8/W14) - dyżury
+// osób WPROWADZANYCH/szkolonych (kod D*/N* w realnym arkuszu), które fizycznie są
+// na dyżurze, ale Piotr nie liczy ich do minimalnej obsady. Pole domyślnie
+// nieustawione (undefined) = liczy się normalnie, jak dotąd.
 function obsadaDnia(wpisy, grupa, typZmiany, data, pracownicy) {
   var grupaId = {};
   pracownicy.filter(function (p) { return p.grupa === grupa; }).forEach(function (p) { grupaId[p.id] = true; });
   var licz = {};
-  wpisy.filter(function (w) { return w.data === data && grupaId[w.pracownikId]; }).forEach(function (w) {
+  wpisy.filter(function (w) { return w.data === data && grupaId[w.pracownikId] && w.liczySieDoObsady !== false; }).forEach(function (w) {
     var kodEfekt = grfKodEfektywny(w);
     if (kodEfekt === typZmiany || kodEfekt === 'DOBA') licz[w.pracownikId] = true;
   });
@@ -520,7 +528,7 @@ function obsadaPielegniarekDnia(wpisy, typZmiany, data, pracownicy) {
     .filter(function (p) { return p.grupa === 'main' && p.stanowisko === 'pielegniarka'; })
     .forEach(function (p) { id[p.id] = true; });
   var licz = {};
-  wpisy.filter(function (w) { return w.data === data && id[w.pracownikId]; }).forEach(function (w) {
+  wpisy.filter(function (w) { return w.data === data && id[w.pracownikId] && w.liczySieDoObsady !== false; }).forEach(function (w) {
     var kodEfekt = grfKodEfektywny(w);
     if (kodEfekt === typZmiany || kodEfekt === 'DOBA') licz[w.pracownikId] = true;
   });

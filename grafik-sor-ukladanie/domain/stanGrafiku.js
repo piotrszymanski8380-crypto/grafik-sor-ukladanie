@@ -80,6 +80,44 @@ function sgZapiszZmiane(stan, zmiana, kto, kontekst) {
 }
 
 /**
+ * sgImportujMiesiac(stan, noweWpisy, kto, opis) -> Stan
+ *
+ * Dopisane 2026-09-05 do importu GOTOWEGO grafiku z realnego arkusza Excela
+ * (domain/importGrafikuExcel.js) - w odróżnieniu od sgZapiszZmiane() (JEDNA
+ * komórka na raz, z historią zmiany tej komórki), ten import NADPISUJE CAŁY
+ * miesiąc naraz gotową listą wpisów z pliku. Historia dostaje JEDEN wpis
+ * podsumowujący (nie jeden na komórkę - setki wpisów naraz zalałyby historię
+ * bez czytelnej wartości), z `opis` (np. "import z pliku płachta_2026.xlsx,
+ * 87 wpisów, 12 do sprawdzenia").
+ *
+ * Świadomie NIE przepuszcza importu przez blokada() (patrz api/grafik.js,
+ * akcja importMasowy) - to dane HISTORYCZNE, mogą łamać reguły appki
+ * (np. odpoczynek), które appka i tak wychwyci później jako zwykłe
+ * Ostrzeżenia do przejrzenia, zamiast blokować sam import.
+ *
+ * Rzuca błąd, jeśli grafik jest już opublikowany - tak samo jak
+ * sgZapiszZmiane(), świadoma ochrona przed nadpisaniem opublikowanej wersji
+ * bez jawnego sgWznowEdycje().
+ */
+function sgImportujMiesiac(stan, noweWpisy, kto, opis) {
+  if (stan.status === 'opublikowany') {
+    throw new Error('SG1 - grafik opublikowany, import zablokowany. Użyj sgWznowEdycje(), żeby świadomie wrócić do wersji roboczej.');
+  }
+  return {
+    status: stan.status,
+    wersja: stan.wersja,
+    wpisy: noweWpisy.slice(),
+    historia: stan.historia.concat([{
+      kiedy: new Date().toISOString(),
+      kto: kto,
+      akcja: 'import_excel',
+      opis: opis || null,
+      liczbaWpisow: noweWpisy.length,
+    }]),
+  };
+}
+
+/**
  * sgOpublikuj(stan, ostrzezenia, kto, opcje?) -> { ok: boolean, powod?: string, stan?: Stan }
  * `ostrzezenia` to wynik ostrzezeniaMiesiaca() z domain/grafik.js, przekazany z
  * zewnątrz (ten moduł nie liczy reguł sam - patrz nagłówek pliku). Blokuje
@@ -153,6 +191,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     sgNowyGrafik: sgNowyGrafik,
     sgZapiszZmiane: sgZapiszZmiane,
+    sgImportujMiesiac: sgImportujMiesiac,
     sgOpublikuj: sgOpublikuj,
     sgWznowEdycje: sgWznowEdycje,
     sgHistoriaKomorki: sgHistoriaKomorki,
