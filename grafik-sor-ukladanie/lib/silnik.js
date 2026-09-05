@@ -12,6 +12,7 @@ const polautomat = require('../domain/polautomat.js');
 const migracjaId = require('../domain/migracjaId.js');
 const importDopasowania = require('../domain/importDopasowania.js');
 const warstwaZgodnosci = require('../domain/warstwaZgodnosci.js');
+const importGrafikuExcel = require('../domain/importGrafikuExcel.js');
 
 const silnikGrafiku = {
   blokada: grafik.blokada,
@@ -43,6 +44,7 @@ module.exports = {
   migracjaId,
   importDopasowania,
   warstwaZgodnosci,
+  importGrafikuExcel,
   silnikGrafiku,
   silnikImportu,
   liczbaDniMiesiaca,
