@@ -318,7 +318,13 @@ function wierszPracownika(p, pokazPolaMain) {
     // kliknięciu przycisku "⏱ od daty…" przy polu Forma. Te same typy pól co reszta
     // kafelka (input type=date jak "Zakończenie", select jak "Forma") - Piotr
     // poprosił 2026-09-06 o kalendarz zamiast okienek prompt().
-    '<div class="pk-forma-panel pk-pola" hidden style="grid-column:1 / -1;border-top:1px dashed var(--border-strong);padding-top:10px;margin-top:2px;">' +
+    // UWAGA: display:none w inline style (NIE atrybut "hidden") - ".pk-pola { display:
+    // grid }" (author stylesheet) i tak przebija "[hidden] { display: none }" z
+    // arkusza przeglądarki niezależnie od specyficzności (origin cascade: author
+    // normal > user-agent normal) - "hidden" by więc NIC nie ukrywał. Zamiast tego
+    // panel.style.display przełączany bezpośrednio w JS (patrz otworzPanelHistoriaFormy/
+    // zapiszZmianeFormy/pfp-anuluj niżej).
+    '<div class="pk-forma-panel pk-pola" style="display:none;grid-column:1 / -1;border-top:1px dashed var(--border-strong);padding-top:10px;margin-top:2px;">' +
       '<label>Obowiązuje od<input type="date" class="pfp-data"></label>' +
       '<label>Nowa forma<select class="pfp-forma"><option value="etat">etat</option><option value="kontrakt">kontrakt</option><option value="zlecenie">zlecenie</option></select></label>' +
       '<label>Nowy etat<input type="number" class="pfp-etat" min="0" max="1" step="0.05" value="1"></label>' +
@@ -376,7 +382,7 @@ function wierszPracownika(p, pokazPolaMain) {
   // (analogicznie do głównego pola Forma - przełącza Etat vs Godz. min/max).
   const panelHistoria = karta.querySelector('.pk-forma-panel');
   karta.querySelector('.p-forma-historia-btn').addEventListener('click', () => otworzPanelHistoriaFormy(karta));
-  karta.querySelector('.pfp-anuluj').addEventListener('click', () => { panelHistoria.hidden = true; });
+  karta.querySelector('.pfp-anuluj').addEventListener('click', () => { panelHistoria.style.display = 'none'; });
   karta.querySelector('.pfp-zapisz').addEventListener('click', () => zapiszZmianeFormy(karta));
   karta.querySelector('.pfp-forma').addEventListener('change', (ev) => {
     const jestEtat = ev.target.value === 'etat';
@@ -413,7 +419,7 @@ function otworzPanelHistoriaFormy(karta) {
   pfpMin.value = poleMin.value || '';
   pfpMax.value = poleMax.value || '';
   pfpForma.dispatchEvent(new Event('change'));
-  panel.hidden = false;
+  panel.style.display = 'grid';
 }
 
 function dodajDzien(dataYmd) {
@@ -484,7 +490,7 @@ function zapiszZmianeFormy(karta) {
   poleMin.value = nowyMin == null ? '' : nowyMin;
   poleMax.value = nowyMax == null ? '' : nowyMax;
 
-  panel.hidden = true;
+  panel.style.display = 'none';
   renderInfoHistoriaFormy(karta);
 }
 
