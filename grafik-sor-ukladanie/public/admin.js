@@ -449,6 +449,18 @@ function dodajDzien(dataYmd) {
   return d.toISOString().slice(0, 10);
 }
 
+function odejmijDzien(dataYmd) {
+  const d = new Date(dataYmd + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/** 'RRRR-MM-DD' -> 'DD.MM.RRRR', jak Piotr pisze daty w appce. */
+function formatujDatePl(dataYmd) {
+  const [r, m, d] = dataYmd.split('-');
+  return d + '.' + m + '.' + r;
+}
+
 // zapiszZmianeFormy(karta) - dopisane 2026-09-06 na prośbę Piotra: "czasami dochodzi
 // zmiana formy zatrudnienia (...) powinno być możliwość zmiany z zachowaniem
 // wcześniejszego [rozliczenia] na okres w który było dane zatrudnienie". Zapisuje
@@ -515,13 +527,32 @@ function zapiszZmianeFormy(karta) {
   renderInfoHistoriaFormy(karta);
 }
 
+// renderInfoHistoriaFormy(karta) - pokazuje historię formy zatrudnienia jako listę
+// PRZEDZIAŁÓW dat (np. "01.01.2026 – 31.08.2026: zlecenie", "od 01.09.2026: etat
+// (aktualnie)") - dopisane/rozbudowane 2026-09-06 na prośbę Piotra: "chciałbym
+// widzieć ewentualną historię zatrudnień np. 1.01.26 do 30.06.26 ..., 01.07.26 do
+// 31.12.26 ...". Koniec każdego przedziału to dzień PRZED początkiem następnego
+// (appka sama go liczy - nie trzeba go osobno wpisywać w panelu "⏱ od daty…").
+// Widoczne w kafelku NAWET gdy jest zwinięty (pk-forma-info jest w .pk-body, więc
+// żeby to zobaczyć trzeba rozwinąć kafelek - patrz też plakietka formy w nagłówku,
+// która zawsze pokazuje formę AKTUALNĄ).
 function renderInfoHistoriaFormy(karta) {
   const info = karta.querySelector('.pk-forma-info');
   if (!info) return;
   let historia;
   try { historia = JSON.parse(karta.dataset.historiaFormy || '[]'); } catch (e) { historia = []; }
-  if (!historia.length) { info.textContent = ''; return; }
-  info.textContent = 'Historia formy: ' + historia.map((h) => (h.obowiazujeOd === '2000-01-01' ? 'do zawsze' : 'od ' + h.obowiazujeOd) + ': ' + h.forma).join(' → ');
+  if (!historia.length) { info.innerHTML = ''; return; }
+  const linie = historia.map((h, i) => {
+    const nastepny = historia[i + 1];
+    const odPl = h.obowiazujeOd === '2000-01-01' ? null : formatujDatePl(h.obowiazujeOd);
+    if (nastepny) {
+      const doPl = formatujDatePl(odejmijDzien(nastepny.obowiazujeOd));
+      return (odPl ? odPl + ' – ' + doPl : 'do ' + doPl) + ': ' + h.forma;
+    }
+    return (odPl ? 'od ' + odPl : 'od początku') + ': ' + h.forma + ' (aktualnie)';
+  });
+  info.innerHTML = '<div style="font-weight:600;color:var(--muted);margin-bottom:2px;">Historia formy zatrudnienia:</div>' +
+    linie.map((l) => '<div>• ' + l + '</div>').join('');
 }
 
 // Kolejność i etykiety podgrup wg formy zatrudnienia WEWNĄTRZ każdej zakładki
