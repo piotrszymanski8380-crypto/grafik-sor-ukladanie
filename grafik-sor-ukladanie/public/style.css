@@ -112,6 +112,21 @@ label { font-size: 13px; color: var(--muted); display: flex; align-items: center
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .row.gap-lg { gap: 16px; }
 
+/* Pasek akcji przyklejony do dołu viewportu podczas przewijania (2026-09-06, na
+   życzenie: "guzik Zapisz listę na samym dole jest złym pomysłem, przy takiej
+   ilości przewijania to jest problematyczne") - dziś używane w Kadrze
+   (Dodaj/Wgraj/Zapisz listę), ale klasa ogólna, można użyć wszędzie tam, gdzie
+   długa, przewijana lista ma na końcu przycisk akcji. Ujemne marginesy boczne/dolne
+   = dokładnie padding .card (16px 18px), żeby pasek dotykał krawędzi karty i dołu
+   ekranu, zamiast wisieć z odstępem. position: sticky trzyma się najbliższego
+   przewijalnego przodka (tu: naturalne przewijanie strony) - działa "z pudełka",
+   bez JS. */
+.pasek-akcji-sticky {
+  position: sticky; bottom: 0; z-index: 5; background: var(--panel);
+  border-top: 1px solid var(--border-strong); border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  margin: 12px -18px -16px; padding: 10px 18px; box-shadow: 0 -6px 12px rgba(20, 24, 33, 0.06);
+}
+
 /* ---------- badge / status ---------- */
 .badge { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 10px; }
 .badge.roboczy { background: var(--accent-bg); color: var(--accent-text); }

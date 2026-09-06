@@ -136,13 +136,19 @@
         <input type="search" id="szukaj-pracownika" class="input-szukaj-kadra" placeholder="🔍 Szukaj po imieniu i nazwisku…" style="margin-bottom:10px">
         <div class="kafelki-siatka" id="tabela-pracownicy-main"></div>
         <div class="kafelki-siatka" id="tabela-pracownicy-opie" style="display:none"></div>
-        <div class="row no-print" style="margin-top:12px">
+        <!-- Pasek akcji PRZYKLEJONY do dołu ekranu (2026-09-06, na życzenie: "guzik
+             Zapisz listę na samym dole jest złym pomysłem, przy takiej ilości
+             przewijania to jest problematyczne") - position: sticky (patrz
+             .pasek-akcji-sticky w style.css) - "Zapisz listę" jest więc zawsze
+             widoczny bez przewijania do końca, niezależnie od tego, ile osób jest
+             na liście / ile kafelków jest rozwiniętych. -->
+        <div class="row no-print pasek-akcji-sticky">
           <button class="btn secondary sm" id="btn-dodaj-pracownika"><i class="ti ti-plus"></i> Dodaj pracownika</button>
           <button class="btn secondary sm" id="btn-wgraj-plik"><i class="ti ti-file"></i> Wgraj z pliku (Excel/CSV)</button>
           <input type="file" id="input-plik-kadra" accept=".xlsx,.xls,.csv" style="display:none">
           <button class="btn sm" id="btn-zapisz-pracownikow">Zapisz listę</button>
+          <div id="pracownicy-msg"></div>
         </div>
-        <div id="pracownicy-msg"></div>
       </div>
     </div>
 
