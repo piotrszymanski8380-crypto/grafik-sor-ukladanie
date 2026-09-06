@@ -388,6 +388,54 @@ function grfWymiarEtatu(pracownik) {
   return (pracownik.etat == null) ? 1 : pracownik.etat;
 }
 
+/**
+ * grfPracownikNaDzien(pracownik, data) -> pracownik (kopia z formą/etatem/zakresem
+ * godzin WŁAŚCIWYM dla `data`) - obsługa zmiany formy zatrudnienia W CZASIE (np.
+ * zlecenie -> etat od danej daty, z zachowaniem poprawnego rozliczenia miesięcy
+ * SPRZED zmiany) - dopisane 2026-09-06 na prośbę Piotra: "czasami dochodzi zmiana
+ * formy zatrudnienia (...) powinno być możliwość zmiany z zachowaniem wcześniejszego
+ * [rozliczenia] na okres w który było dane zatrudnienie". Wybór sposobu (data zmiany +
+ * nowa forma, nie osobny "okres obowiązywania od-do") potwierdzony przez Piotra przez
+ * AskUserQuestion.
+ *
+ * `pracownik.historiaFormy` (opcjonalne): [{forma, etat, zlecenieMinGodzin,
+ * zlecenieMaxGodzin, obowiazujeOd:'YYYY-MM-DD'}, ...] w kolejności CHRONOLOGICZNEJ
+ * (rosnąco wg obowiazujeOd - kolejność narzucona przez UI Kadry, nie sortowana tu).
+ * Pola forma/etat/zlecenieMinGodzin/zlecenieMaxGodzin NA SZCZYCIE obiektu pracownika
+ * (poza historiaFormy) zawsze odzwierciedlają NAJNOWSZY (aktualny) segment - dla
+ * reszty appki (i starych danych bez historiaFormy) nic się nie zmienia; ta funkcja
+ * jest jedynym miejscem, które "cofa się w czasie" do wcześniejszego zatrudnienia.
+ *
+ * Brak `historiaFormy` (undefined/pusta tablica) -> zwraca pracownik BEZ ZMIAN (ta sama
+ * referencja) - zero ryzyka dla danych/testów sprzed tej funkcji. `data` wcześniejsza
+ * niż najwcześniejszy segment -> używa TEGO najwcześniejszego segmentu (najlepsze
+ * dostępne przybliżenie - appka nie zna formy sprzed pierwszego zapisanego wpisu).
+ *
+ * UWAGA - UPROSZCZENIE dla reguł liczonych w OKRESIE (nie na pojedynczy dzień): W5
+ * (2 miesiące), W6-tydzień, W9/W20 (rok), W15 (miesiąc), W18 (2 miesiące) - wywołujący
+ * (ostrzezeniaMiesiaca niżej) rozstrzyga formę na OSTATNI dzień przeglądanego miesiąca/
+ * okresu, nie liczy proporcjonalnie przy zmianie W TRAKCIE okresu. Jeśli forma zmieniła
+ * się w środku okresu rozliczeniowego, wynik może być niedokładny w tym jednym okresie
+ * przejściowym - świadomy kompromis, zakomunikowany Piotrowi (zamiast dalszego pytania
+ * blokującego), bo dokładne rozbicie proporcjonalne per-dzień w środku okresu byłoby
+ * nieproporcjonalnie skomplikowane wobec tego, jak rzadko realnie się zdarza.
+ */
+function grfPracownikNaDzien(pracownik, data) {
+  var historia = pracownik.historiaFormy;
+  if (!historia || !historia.length) return pracownik;
+  var wybrany = null;
+  for (var i = 0; i < historia.length; i++) {
+    if (historia[i].obowiazujeOd <= data) wybrany = historia[i];
+  }
+  if (!wybrany) wybrany = historia[0];
+  return Object.assign({}, pracownik, {
+    forma: wybrany.forma,
+    etat: wybrany.etat,
+    zlecenieMinGodzin: wybrany.zlecenieMinGodzin,
+    zlecenieMaxGodzin: wybrany.zlecenieMaxGodzin,
+  });
+}
+
 // ---------- pomocnicze: dostęp do wpisów ----------
 
 /** Buduje indeks {pracownikId: {data: [kod, ...]}} z listy wpisów dla szybkiego odczytu. */
@@ -429,6 +477,9 @@ function grfGlownyKod(indeks, pracownikId, data) {
 function blokada(pracownik, data, kod, wpisy, parametry) {
   parametry = parametry || DOMYSLNE_PARAMETRY;
   if (kod === '' || kod === 'W') return null;
+  // Rozstrzygnij formę/etat/zakres godzin z umowy WEDŁUG DNIA wpisu (nie zawsze
+  // aktualnej formy pracownika) - patrz grfPracownikNaDzien.
+  pracownik = grfPracownikNaDzien(pracownik, data);
 
   var indeks = zbudujIndeks(wpisy);
   var dzisiaj = grfGlownyKod(indeks, pracownik.id, data);
@@ -737,11 +788,21 @@ function ostrzezeniaMiesiaca(wpisy, pracownicy, rok, miesiac, parametry, wpisyRo
   pracownicy.forEach(function (p) {
     var nockiZRzedu = 0;
     var zmianZRzedu = 0;
+    // Forma/etat/zakres godzin WŁAŚCIWY dla reguł liczonych w OKRESIE (nie na
+    // pojedynczy dzień): W4/W6/W9/W20 (tydzień/rok), W5/W15/W18 (miesiąc/2 miesiące) -
+    // te ostatnie i tak zgłaszają się TYLKO przy przeglądzie ZAMYKAJĄCEGO miesiąca
+    // swojego okresu, więc koniec przeglądanego miesiąca = koniec ich okresu.
+    // Uproszczenie opisane przy grfPracownikNaDzien.
+    var pOkresMiesiac = grfPracownikNaDzien(p, dataOf(dniWMiesiacu));
 
     for (var d = 1; d <= dniWMiesiacu; d++) {
       var data = dataOf(d);
       var kod = grfGlownyKod(indeks, p.id, data);
       var jutro = grfGlownyKod(indeks, p.id, dodajDni(data, 1));
+      // Forma zatrudnienia WŁAŚCIWA na TEN KONKRETNY dzień (może się różnić od
+      // aktualnej p.forma, jeśli osoba miała zmianę formy w trakcie - patrz
+      // grfPracownikNaDzien).
+      var pDzien = grfPracownikNaDzien(p, data);
 
       // W3 wykryte w istniejących danych (np. po imporcie z Excela) - HARD dla
       // WSZYSTKICH form zatrudnienia (poprawione 2026-08-30, zgodnie z blokada() wyżej).
@@ -780,7 +841,7 @@ function ostrzezeniaMiesiaca(wpisy, pracownicy, rok, miesiac, parametry, wpisyRo
             komunikat: 'Dyżur DOBA, ale oddział nie stosuje dyżurów DOBA (parametr oddziału).',
           });
         }
-        if (kod === 'DOBA' && p.forma === 'etat') {
+        if (kod === 'DOBA' && pDzien.forma === 'etat') {
           out.push({
             sev: 'hard', rule: 'W7', pracownikId: p.id, data: data,
             komunikat: 'Dyżur DOBA u osoby na etacie - DOBA dostępna tylko dla kontraktu/zlecenia.',
@@ -868,7 +929,7 @@ function ostrzezeniaMiesiaca(wpisy, pracownicy, rok, miesiac, parametry, wpisyRo
       }
     }
 
-    if (p.forma === 'etat') {
+    if (pOkresMiesiac.forma === 'etat') {
       var tygodnie = {};
       for (var d2 = 1; d2 <= dniWMiesiacu; d2++) {
         var data2 = dataOf(d2);
@@ -903,7 +964,7 @@ function ostrzezeniaMiesiaca(wpisy, pracownicy, rok, miesiac, parametry, wpisyRo
       Object.keys(tygodnie).forEach(function (tydz) {
         var dni = tygodnie[tydz];
         var godz = dni.reduce(function (s, data4) {
-          return s + grfKodyDnia(indeks, p.id, data4).reduce(function (a, k) { return a + godzinyKodu(k, grfWymiarEtatu(p)); }, 0);
+          return s + grfKodyDnia(indeks, p.id, data4).reduce(function (a, k) { return a + godzinyKodu(k, grfWymiarEtatu(pOkresMiesiac)); }, 0);
         }, 0);
         if (godz > parametry.limit48hTygodniowo) {
           out.push({
@@ -922,12 +983,12 @@ function ostrzezeniaMiesiaca(wpisy, pracownicy, rok, miesiac, parametry, wpisyRo
     // wyrównać w drugim, więc ostrzeżenie o odchyleniu byłoby przedwczesne/mylące.
     // WAŻNE: `wpisy` przekazane do ostrzezeniaMiesiaca() muszą obejmować OBA miesiące
     // pary (nie tylko przeglądany `miesiac`), inaczej suma godzin będzie zaniżona.
-    if (p.forma === 'etat') {
+    if (pOkresMiesiac.forma === 'etat') {
       var startOkresu = grfMiesiacStartuOkresu(miesiac);
       var koniecOkresu = startOkresu + 1;
       if (miesiac === koniecOkresu) {
-        var hOkresu = godzinyOkresuRozliczeniowego(wpisy, p.id, grfWymiarEtatu(p), rok, miesiac);
-        var wymOkresu = wymiarOkresuRozliczeniowego(p, rok, miesiac, parametry);
+        var hOkresu = godzinyOkresuRozliczeniowego(wpisy, p.id, grfWymiarEtatu(pOkresMiesiac), rok, miesiac);
+        var wymOkresu = wymiarOkresuRozliczeniowego(pOkresMiesiac, rok, miesiac, parametry);
         var etykietaOkresu = String(startOkresu).padStart(2, '0') + '-' + String(koniecOkresu).padStart(2, '0') + '.' + rok;
         if (hOkresu > wymOkresu + parametry.toleranckaWymiaruH) {
           out.push({ sev: 'soft', rule: 'W5', pracownikId: p.id, data: dataOf(1), komunikat: 'Przekroczony wymiar okresu rozliczeniowego ' + etykietaOkresu + ': ' + grfHm(hOkresu) + ' wobec ' + grfHm(wymOkresu) + '.' });
@@ -946,7 +1007,7 @@ function ostrzezeniaMiesiaca(wpisy, pracownicy, rok, miesiac, parametry, wpisyRo
     // MIESIĄC, na podstawie wpisów z samego przeglądanego `miesiac` (nie pary
     // miesięcy jak w W5). Miękkie (soft) - to umowa cywilnoprawna, nie przepis
     // prawa pracy jak W5/W6, więc nie blokuje publikacji domyślnie.
-    if ((p.forma === 'zlecenie' || p.forma === 'kontrakt') && (typeof p.zlecenieMinGodzin === 'number' || typeof p.zlecenieMaxGodzin === 'number')) {
+    if ((pOkresMiesiac.forma === 'zlecenie' || pOkresMiesiac.forma === 'kontrakt') && (typeof pOkresMiesiac.zlecenieMinGodzin === 'number' || typeof pOkresMiesiac.zlecenieMaxGodzin === 'number')) {
       var prefiksMiesiaca15 = rok + '-' + String(miesiac).padStart(2, '0');
       var wpisyMiesiaca15 = wpisy.filter(function (w) { return w.pracownikId === p.id && w.data.indexOf(prefiksMiesiaca15) === 0; });
       // godzinyDyzurowPracownika (NIE godzinyPracownika) - patrz komentarz przy tej
@@ -963,24 +1024,24 @@ function ostrzezeniaMiesiaca(wpisy, pracownicy, rok, miesiac, parametry, wpisyRo
       // limit (minimum) z umowy o 8h - górny limit (max) zostaje bez zmian (Piotr
       // potwierdził oba wybory). Bez tego appka fałszywie zgłaszała niedobór osobie,
       // która była legalnie na zatwierdzonym urlopie.
-      var minGodzin15 = p.zlecenieMinGodzin;
+      var minGodzin15 = pOkresMiesiac.zlecenieMinGodzin;
       var dniUrlopuKontrakt15 = 0;
-      if (p.forma === 'kontrakt' && typeof minGodzin15 === 'number') {
+      if (pOkresMiesiac.forma === 'kontrakt' && typeof minGodzin15 === 'number') {
         dniUrlopuKontrakt15 = wpisyMiesiaca15.filter(function (w) { return grfKodEfektywny(w) === 'UW'; }).length;
         minGodzin15 = Math.max(0, minGodzin15 - dniUrlopuKontrakt15 * 8);
       }
 
-      if (typeof p.zlecenieMaxGodzin === 'number' && hMiesiaca15 > p.zlecenieMaxGodzin) {
+      if (typeof pOkresMiesiac.zlecenieMaxGodzin === 'number' && hMiesiaca15 > pOkresMiesiac.zlecenieMaxGodzin) {
         out.push({
           sev: 'soft', rule: 'W15', pracownikId: p.id, data: dataOf(1),
-          komunikat: 'Przekroczony maksymalny zakres godzin miesiąca ' + etykietaMiesiaca15 + ': ' + grfHm(hMiesiaca15) + ' wobec max ' + grfHm(p.zlecenieMaxGodzin) + ' z umowy.',
+          komunikat: 'Przekroczony maksymalny zakres godzin miesiąca ' + etykietaMiesiaca15 + ': ' + grfHm(hMiesiaca15) + ' wobec max ' + grfHm(pOkresMiesiac.zlecenieMaxGodzin) + ' z umowy.',
         });
       }
       if (typeof minGodzin15 === 'number' && hMiesiaca15 < minGodzin15) {
         out.push({
           sev: 'soft', rule: 'W15', pracownikId: p.id, data: dataOf(1),
           komunikat: 'Niedobór do minimalnego zakresu godzin miesiąca ' + etykietaMiesiaca15 + ': ' + grfHm(hMiesiaca15) + ' wobec min ' + grfHm(minGodzin15) + ' z umowy' +
-            (dniUrlopuKontrakt15 ? ' (pomniejszone o ' + dniUrlopuKontrakt15 + ' dni urlopu × 8h z ' + grfHm(p.zlecenieMinGodzin) + ')' : '') + '.',
+            (dniUrlopuKontrakt15 ? ' (pomniejszone o ' + dniUrlopuKontrakt15 + ' dni urlopu × 8h z ' + grfHm(pOkresMiesiac.zlecenieMinGodzin) + ')' : '') + '.',
         });
       }
     }
@@ -989,8 +1050,8 @@ function ostrzezeniaMiesiaca(wpisy, pracownicy, rok, miesiac, parametry, wpisyRo
     // wcześniej liczone tylko w obrębie przeglądanego miesiąca (zaniżało wynik) -
     // patrz grfDniIGodzinyKoduWRoku i komentarz `wpisyRoczne` w nagłówku funkcji.
     // Tylko etat (Nż to uprawnienie KP - patrz domain/urlopy.js).
-    if (p.forma === 'etat') {
-      var nzRoku = grfDniIGodzinyKoduWRoku(roczne, p.id, 'Nz', rok, grfWymiarEtatu(p)).dni;
+    if (pOkresMiesiac.forma === 'etat') {
+      var nzRoku = grfDniIGodzinyKoduWRoku(roczne, p.id, 'Nz', rok, grfWymiarEtatu(pOkresMiesiac)).dni;
       if (nzRoku > parametry.limitNzDniRok) {
         out.push({
           sev: 'soft', rule: 'W9', pracownikId: p.id, data: dataOf(1),
@@ -1010,7 +1071,7 @@ function ostrzezeniaMiesiaca(wpisy, pracownicy, rok, miesiac, parametry, wpisyRo
     ];
     for (var liW16 = 0; liW16 < limityRoczneW16.length; liW16++) {
       var limW16 = limityRoczneW16[liW16];
-      var wynikW16 = grfDniIGodzinyKoduWRoku(roczne, p.id, limW16.kod, rok, grfWymiarEtatu(p));
+      var wynikW16 = grfDniIGodzinyKoduWRoku(roczne, p.id, limW16.kod, rok, grfWymiarEtatu(pOkresMiesiac));
       var jednostkaW16 = p[limW16.pole] === 'godziny' ? 'godziny' : 'dni';
       if (jednostkaW16 === 'dni' && wynikW16.dni > 2) {
         out.push({
@@ -1058,7 +1119,7 @@ function ostrzezeniaMiesiaca(wpisy, pracownicy, rok, miesiac, parametry, wpisyRo
     // Zgłaszane na KAŻDEJ niedzieli z dyżurem, jeśli trzy poprzedzające niedziele
     // (dokładnie 7/14/21 dni wcześniej) TEŻ miały dyżur - nie tylko na "dokładnie
     // 4.", żeby appka nie przestała ostrzegać, gdyby seria ciągnęła się dalej.
-    if (p.forma === 'etat') {
+    if (pOkresMiesiac.forma === 'etat') {
       for (var dNiedz = 1; dNiedz <= dniWMiesiacu; dNiedz++) {
         var dataNiedz = dataOf(dNiedz);
         if (grfDataDoObiektu(dataNiedz).getUTCDay() !== 0) continue; // tylko niedziele
@@ -1097,7 +1158,7 @@ function ostrzezeniaMiesiaca(wpisy, pracownicy, rok, miesiac, parametry, wpisyRo
   if (miesiac === startOkresuW18 + 1) {
     ['main', 'opie'].forEach(function (grupaW18) {
       var doPorownaniaW18 = pracownicy.filter(function (p) {
-        if (p.grupa !== grupaW18 || p.forma !== 'etat') return false;
+        if (p.grupa !== grupaW18 || grfPracownikNaDzien(p, dataOf(dniWMiesiacu)).forma !== 'etat') return false;
         if (p.flagi && p.flagi.indexOf('zgoda_mniej_nocek') !== -1) return false;
         if (grupaW18 === 'main' && p.flagi && p.flagi.indexOf('bez_nocek') !== -1) return false;
         if (grupaW18 === 'opie' && p.typyDyzuru && p.typyDyzuru.indexOf('tylko_dzien') !== -1) return false;
@@ -1242,16 +1303,27 @@ function grfPodpowiedzCyklu(wpisy, pracownikId, data) {
  * filtr - nikogo nie wyklucza), POTEM (w ramach tej samej zgodności) rosnąco po
  * wykorzystaniu wymiaru (nie po godzinach bezwzględnych - etaty cząstkowe
  * zawyżałyby ranking).
+ *
+ * `pracownik.dataZakonczenia` (opcjonalne, 'YYYY-MM-DD') - dopisane 2026-09-06 na
+ * prośbę Piotra: "nie ma informacji, iż była umowa rozwiązana lub się zakończyła,
+ * bo w następnych miesiącach ta osoba już nie powinna być ujmowana w grafiku".
+ * Potwierdzone przez AskUserQuestion: WYŁĄCZNIE znika z generatora/kandydatów na
+ * dziurę obsadową od dnia PO `dataZakonczenia` (nie z listy Kadry, nie z już
+ * zapisanego grafiku przeszłych miesięcy - te zostają bez zmian).
  */
 function kandydaciNaDziure(data, typZmiany, grupa, wpisy, pracownicy, rok, miesiac, parametry) {
   parametry = parametry || DOMYSLNE_PARAMETRY;
   var indeks = zbudujIndeks(wpisy);
   return pracownicy
     .filter(function (p) { return p.grupa === grupa; })
+    .filter(function (p) { return !p.dataZakonczenia || data <= p.dataZakonczenia; })
     .filter(function (p) { return grfKodyDnia(indeks, p.id, data).length === 0; })
     .filter(function (p) { return blokada(p, data, typZmiany, wpisy, parametry) === null; })
     .map(function (p) {
-      var podpowiedz = p.forma === 'etat' ? grfPodpowiedzCyklu(wpisy, p.id, data) : null;
+      // Forma/etat WŁAŚCIWY dla `data` (może się różnić od aktualnej p.forma przy
+      // zmianie formy w trakcie - patrz grfPracownikNaDzien).
+      var pDzien = grfPracownikNaDzien(p, data);
+      var podpowiedz = pDzien.forma === 'etat' ? grfPodpowiedzCyklu(wpisy, p.id, data) : null;
       // 0 = cykl poleca dokładnie ten typ dziś (najlepiej dopasowany kandydat),
       // 1 = brak jednoznacznej podpowiedzi (neutralnie, jak dotychczas),
       // 2 = cykl sugerowałby dziś odpoczynek - najmniej preferowany, ale wciąż
@@ -1260,7 +1332,7 @@ function kandydaciNaDziure(data, typZmiany, grupa, wpisy, pracownicy, rok, miesi
       return {
         pracownik: p,
         zgodnoscCyklu: zgodnoscCyklu,
-        wykorzystanieWymiaru: godzinyPracownika(wpisy, p.id, grfWymiarEtatu(p)) / (wymiarMiesieczny(p, rok, miesiac, parametry) || 1),
+        wykorzystanieWymiaru: godzinyPracownika(wpisy, p.id, grfWymiarEtatu(pDzien)) / (wymiarMiesieczny(pDzien, rok, miesiac, parametry) || 1),
       };
     })
     .sort(function (a, b) {
@@ -1382,6 +1454,7 @@ if (typeof module !== 'undefined' && module.exports) {
     grfMaOdbiorWOknie: grfMaOdbiorWOknie,
     grfKoniecOkresuRozliczeniowego: grfKoniecOkresuRozliczeniowego,
     grfRoznicaDni: grfRoznicaDni,
+    grfPracownikNaDzien: grfPracownikNaDzien,
     odm: odm,
     ostrzezeniaMiesiaca: ostrzezeniaMiesiaca,
     grfPodpowiedzCyklu: grfPodpowiedzCyklu,
