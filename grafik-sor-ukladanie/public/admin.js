@@ -279,19 +279,29 @@ function inicjaly(imieNazwisko) {
 // identycznie, zmienił się tylko układ HTML/wizualny. Pola SAP/Bez nocek/Opt-out
 // dotyczą tylko main, "Typ dyżuru" tylko opie - "Zgoda: mniej nocek" (W18) jest
 // wspólna dla obu grup.
-function wierszPracownika(p, pokazPolaMain) {
+// wierszPracownika(p, pokazPolaMain, rozwiniety) - `rozwiniety` (domyślnie false)
+// kontroluje, czy kafelek startuje ROZWINIĘTY (pełny formularz widoczny) czy
+// ZWINIĘTY (tylko nagłówek: avatar/nazwisko/plakietka formy) - dopisane 2026-09-06
+// na prośbę Piotra: "bardzo dużo do przewijania, czy nie lepiej by była lista i po
+// kliknięciu otwierał się panel pracownika". Istniejący personel (renderTabelePracownikow)
+// startuje ZWINIĘTY, nowo dodawana osoba (btn-dodaj-pracownika) - ROZWINIĘTA (żeby
+// od razu było widać pole do wpisania nazwiska).
+function wierszPracownika(p, pokazPolaMain, rozwiniety) {
   p = p || { id: '', imieNazwisko: '', forma: 'etat', etat: 1, grupa: 'main', stanowisko: '', flagi: [], optOutZgoda: false, typyDyzuru: [] };
   if (pokazPolaMain == null) pokazPolaMain = p.grupa !== 'opie';
   const flagi = p.flagi || [];
   const typyDyzuru = p.typyDyzuru || [];
   const karta = document.createElement('div');
-  karta.className = 'pracownik-kafelek';
+  karta.className = 'pracownik-kafelek' + (rozwiniety ? '' : ' zwiniety');
   karta.innerHTML =
     '<div class="pk-glowka">' +
+      '<i class="ti ti-chevron-down pk-chevron"></i>' +
       '<div class="pk-avatar">' + inicjaly(p.imieNazwisko) + '</div>' +
       '<input type="text" class="p-nazwa pk-nazwa" value="' + (p.imieNazwisko || '').replace(/"/g, '&quot;') + '" placeholder="Imię i nazwisko">' +
+      '<span class="pk-forma-znacznik">' + p.forma + '</span>' +
       '<button type="button" class="icon-btn btn-usun-p" title="Usuń"><i class="ti ti-trash"></i></button>' +
     '</div>' +
+    '<div class="pk-body">' +
     '<div class="pk-forma-info" style="font-size:.8em;color:#777;"></div>' +
     '<div class="pk-pola">' +
       '<label>Forma<span class="pk-forma-wrap"><select class="p-forma"><option value="etat"' + (p.forma === 'etat' ? ' selected' : '') + '>etat</option>' +
@@ -348,7 +358,8 @@ function wierszPracownika(p, pokazPolaMain) {
           '<label class="pk-flaga"><input type="checkbox" class="p-dyzur-noc"' + (typyDyzuru.indexOf('noc') !== -1 ? ' checked' : '') + '> Noc</label>' +
           '<label class="pk-flaga"><input type="checkbox" class="p-dyzur-tylko-dzien"' + (typyDyzuru.indexOf('tylko_dzien') !== -1 ? ' checked' : '') + '> Tylko dzień</label>' +
           '<label class="pk-flaga"><input type="checkbox" class="p-dyzur-doba"' + (typyDyzuru.indexOf('doba') !== -1 ? ' checked' : '') + '> Doba</label>') +
-    '</div>';
+    '</div>' +
+    '</div>'; // zamyka .pk-body
   karta.dataset.id = p.id || '';
   // historiaFormy - NIE jest osobnym widocznym polem formularza (nie ma sensownej
   // reprezentacji jako pojedynczy input) - trzymana jako JSON w dataset, edytowana
@@ -377,6 +388,16 @@ function wierszPracownika(p, pokazPolaMain) {
     polEtat.disabled = !jestEtat;
     karta.querySelector('.p-sw-jednostka').disabled = !jestEtat;
     karta.querySelector('.p-op-jednostka').disabled = !jestEtat;
+    // Plakietka formy w zwiniętym nagłówku - patrz .pk-forma-znacznik (dopisane
+    // 2026-09-06 razem z widokiem listy/grupowaniem wg formy).
+    karta.querySelector('.pk-forma-znacznik').textContent = ev.target.value;
+  });
+  // Zwijanie/rozwijanie kafelka kliknięciem w nagłówek (2026-09-06, patrz komentarz
+  // przy wierszPracownika() wyżej) - z wyjątkiem kliknięcia w samo pole nazwiska
+  // (edycja tekstu) albo przycisk usuwania, żeby te akcje nie przełączały zwinięcia.
+  karta.querySelector('.pk-glowka').addEventListener('click', (ev) => {
+    if (ev.target.closest('.p-nazwa, .btn-usun-p')) return;
+    karta.classList.toggle('zwiniety');
   });
   // Panel "⏱ od daty…" - otwiera/zamyka + reaguje na zmianę formy WEWNĄTRZ panelu
   // (analogicznie do głównego pola Forma - przełącza Etat vs Godz. min/max).
@@ -503,24 +524,72 @@ function renderInfoHistoriaFormy(karta) {
   info.textContent = 'Historia formy: ' + historia.map((h) => (h.obowiazujeOd === '2000-01-01' ? 'do zawsze' : 'od ' + h.obowiazujeOd) + ': ' + h.forma).join(' → ');
 }
 
+// Kolejność i etykiety podgrup wg formy zatrudnienia WEWNĄTRZ każdej zakładki
+// main/opie - dopisane 2026-09-06 na prośbę Piotra ("z podziałem na piel/rat i
+// opiekunowie a pod tym na etat, zlecenie, kontrakt").
+const KOLEJNOSC_FORM_KADRA = ['etat', 'zlecenie', 'kontrakt'];
+const ETYKIETY_FORM_KADRA = { etat: 'Etat', zlecenie: 'Zlecenie', kontrakt: 'Kontrakt' };
+
 function renderTabelePracownikow() {
   const siatkaMain = document.getElementById('tabela-pracownicy-main');
   const siatkaOpie = document.getElementById('tabela-pracownicy-opie');
   siatkaMain.innerHTML = '';
   siatkaOpie.innerHTML = '';
-  pracownicy.forEach((p) => {
-    const jestOpie = p.grupa === 'opie';
-    const karta = wierszPracownika(p, !jestOpie);
-    (jestOpie ? siatkaOpie : siatkaMain).appendChild(karta);
+  [{ siatka: siatkaMain, jestOpie: false }, { siatka: siatkaOpie, jestOpie: true }].forEach(({ siatka, jestOpie }) => {
+    const osobyGrupy = pracownicy.filter((p) => (p.grupa === 'opie') === jestOpie);
+    KOLEJNOSC_FORM_KADRA.forEach((forma) => {
+      const osobyFormy = osobyGrupy.filter((p) => (p.forma || 'etat') === forma);
+      if (!osobyFormy.length) return;
+      const naglowek = document.createElement('div');
+      naglowek.className = 'pk-grupa-naglowek';
+      naglowek.textContent = ETYKIETY_FORM_KADRA[forma] + ' (' + osobyFormy.length + ')';
+      siatka.appendChild(naglowek);
+      osobyFormy.forEach((p) => siatka.appendChild(wierszPracownika(p, !jestOpie)));
+    });
+  });
+  filtrujKadre();
+}
+
+// filtrujKadre() - szukajka #szukaj-pracownika (2026-09-06, na życzenie: "brak
+// wyszukiwania, bardzo dużo do przewijania"). Filtruje kafelki po imieniu/nazwisku
+// (normKlucz - bez rozróżniania wielkości liter i polskich znaków diakrytycznych,
+// ta sama funkcja co przy imporcie z pliku) i ukrywa nagłówek podgrupy (Etat/
+// Zlecenie/Kontrakt), jeśli żaden kafelek w niej nie pasuje.
+function filtrujKadre() {
+  const zapytanie = normKlucz(document.getElementById('szukaj-pracownika').value);
+  ['tabela-pracownicy-main', 'tabela-pracownicy-opie'].forEach((idSiatki) => {
+    let ostatniNaglowek = null;
+    let cokolwiekWGrupie = false;
+    Array.from(document.getElementById(idSiatki).children).forEach((el) => {
+      if (el.classList.contains('pk-grupa-naglowek')) {
+        if (ostatniNaglowek) ostatniNaglowek.style.display = cokolwiekWGrupie ? '' : 'none';
+        ostatniNaglowek = el;
+        cokolwiekWGrupie = false;
+        return;
+      }
+      if (!el.classList.contains('pracownik-kafelek')) return;
+      const nazwa = normKlucz(el.querySelector('.p-nazwa').value);
+      const pasuje = !zapytanie || nazwa.indexOf(zapytanie) !== -1;
+      el.style.display = pasuje ? '' : 'none';
+      if (pasuje) cokolwiekWGrupie = true;
+    });
+    if (ostatniNaglowek) ostatniNaglowek.style.display = cokolwiekWGrupie ? '' : 'none';
   });
 }
+document.getElementById('szukaj-pracownika').addEventListener('input', filtrujKadre);
 
 document.getElementById('btn-dodaj-pracownika').addEventListener('click', () => {
   const siatka = document.getElementById(aktywnaGrupa === 'opie' ? 'tabela-pracownicy-opie' : 'tabela-pracownicy-main');
   const nowyId = 'p' + (Date.now().toString(36));
-  const karta = wierszPracownika({ id: nowyId, forma: 'etat', etat: 1, grupa: aktywnaGrupa }, aktywnaGrupa !== 'opie');
+  // rozwiniety=true - nowa osoba ma od razu widoczny formularz (patrz komentarz
+  // przy wierszPracownika() wyżej). Dopisywana na końcu listy (nie wewnątrz podgrup
+  // formy) - po "Zapisz listę" trafi do właściwej podgrupy przy następnym renderze.
+  const karta = wierszPracownika({ id: nowyId, forma: 'etat', etat: 1, grupa: aktywnaGrupa }, aktywnaGrupa !== 'opie', true);
   siatka.appendChild(karta);
+  document.getElementById('szukaj-pracownika').value = '';
+  filtrujKadre();
   karta.querySelector('.p-nazwa').focus();
+  karta.scrollIntoView({ behavior: 'smooth', block: 'center' });
 });
 
 document.getElementById('btn-zapisz-pracownikow').addEventListener('click', async () => {

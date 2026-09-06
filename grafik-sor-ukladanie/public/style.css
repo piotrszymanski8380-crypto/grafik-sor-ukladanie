@@ -102,7 +102,7 @@ button { font-family: inherit; }
 .icon-btn { background: none; border: none; cursor: pointer; color: var(--muted); padding: 4px; border-radius: 6px; }
 .icon-btn:hover { background: var(--bg); color: var(--text); }
 
-input[type=text], input[type=number], input[type=password], input[type=file], select, textarea {
+input[type=text], input[type=number], input[type=password], input[type=file], input[type=search], select, textarea {
   font-family: inherit; font-size: 13px; padding: 7px 9px; border: 1px solid var(--border-strong);
   border-radius: var(--radius); background: var(--panel); color: var(--text);
 }
@@ -247,15 +247,25 @@ table.staff td input, table.staff td select { width: 100%; }
 /* ---------- kadra jako kafelki (2026-08-30, "aby każdy pracownik był w formie
    kafelka") - siatka kart zamiast wierszy tabeli; pola i klasy CSS wewnątrz są
    te same co poprzednio (p-nazwa, p-forma, ...), zmienił się tylko układ. ---------- */
-.kafelki-siatka {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 14px; align-items: start;
+/* 2026-09-06: siatka kart -> pionowa LISTA (na życzenie: "bardzo dużo do
+   przewijania") - kafelki domyślnie zwinięte do samego nagłówka (patrz .zwiniety
+   .pk-body niżej), więc lista mieści dużo więcej osób na ekranie niż siatka 300px
+   kart. Grupowanie wg formy zatrudnienia (etat/zlecenie/kontrakt) - patrz
+   .pk-grupa-naglowek - i szukajka (#szukaj-pracownika) - patrz filtrujKadre() w admin.js. */
+.kafelki-siatka { display: flex; flex-direction: column; gap: 8px; }
+.pk-grupa-naglowek {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--muted); padding: 10px 2px 2px; margin-top: 4px;
 }
+.pk-grupa-naglowek:first-child { margin-top: 0; }
+.input-szukaj-kadra { width: 100%; max-width: 420px; }
 .pracownik-kafelek {
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg);
-  padding: 14px; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow);
+  padding: 10px 14px; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow);
 }
-.pk-glowka { display: flex; align-items: center; gap: 10px; }
+.pk-glowka { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.pk-chevron { color: var(--muted); flex-shrink: 0; transition: transform 0.15s; display: flex; }
+.pracownik-kafelek.zwiniety .pk-chevron { transform: rotate(-90deg); }
 .pk-avatar {
   width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: #fff;
   display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;
@@ -263,9 +273,16 @@ table.staff td input, table.staff td select { width: 100%; }
 }
 .pk-nazwa {
   flex: 1; min-width: 0; border: none; background: none; font-size: 14.5px; font-weight: 600;
-  padding: 4px 2px; border-radius: 6px;
+  padding: 4px 2px; border-radius: 6px; cursor: text;
 }
 .pk-nazwa:focus { outline: 2px solid var(--accent-bg); background: var(--bg); }
+.pk-forma-znacznik {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--muted);
+  background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px;
+  flex-shrink: 0;
+}
+.pk-body { display: flex; flex-direction: column; gap: 12px; }
+.pracownik-kafelek.zwiniety .pk-body { display: none; }
 .pk-pola { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 10px; }
 .pk-pola label {
   display: flex; flex-direction: column; gap: 3px; font-size: 10.5px; font-weight: 600;

@@ -128,6 +128,12 @@
              wierszPracownika() w admin.js (nazwa funkcji/klasy pól CSS zostały bez
              zmian z poprzedniej wersji tabelarycznej - zmienił się tylko układ HTML,
              logika zbierania/zapisu/wgrywania z pliku jest identyczna). -->
+        <!-- Szukajka (2026-09-06, na życzenie: "brak wyszukiwania, bardzo dużo do
+             przewijania") - filtruje kafelki poniżej po imieniu/nazwisku, patrz
+             filtrujKadre() w admin.js. Kafelki domyślnie ZWINIĘTE (patrz wierszPracownika()
+             parametr rozwiniety) i pogrupowane wg formy zatrudnienia (etat/zlecenie/
+             kontrakt) - klik w nagłówek kafelka rozwija pełny formularz danej osoby. -->
+        <input type="search" id="szukaj-pracownika" class="input-szukaj-kadra" placeholder="🔍 Szukaj po imieniu i nazwisku…" style="margin-bottom:10px">
         <div class="kafelki-siatka" id="tabela-pracownicy-main"></div>
         <div class="kafelki-siatka" id="tabela-pracownicy-opie" style="display:none"></div>
         <div class="row no-print" style="margin-top:12px">
