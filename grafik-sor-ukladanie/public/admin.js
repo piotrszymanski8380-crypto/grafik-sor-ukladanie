@@ -314,6 +314,21 @@ function wierszPracownika(p, pokazPolaMain) {
         '<option value="dni"' + (p.opiekaJednostka !== 'godziny' ? ' selected' : '') + '>dni</option>' +
         '<option value="godziny"' + (p.opiekaJednostka === 'godziny' ? ' selected' : '') + '>godz.</option></select></label>' +
     '</div>' +
+    // Panel "zmień formę od daty" - domyślnie ukryty (hidden), pokazuje się po
+    // kliknięciu przycisku "⏱ od daty…" przy polu Forma. Te same typy pól co reszta
+    // kafelka (input type=date jak "Zakończenie", select jak "Forma") - Piotr
+    // poprosił 2026-09-06 o kalendarz zamiast okienek prompt().
+    '<div class="pk-forma-panel pk-pola" hidden style="grid-column:1 / -1;border-top:1px dashed var(--border-strong);padding-top:10px;margin-top:2px;">' +
+      '<label>Obowiązuje od<input type="date" class="pfp-data"></label>' +
+      '<label>Nowa forma<select class="pfp-forma"><option value="etat">etat</option><option value="kontrakt">kontrakt</option><option value="zlecenie">zlecenie</option></select></label>' +
+      '<label>Nowy etat<input type="number" class="pfp-etat" min="0" max="1" step="0.05" value="1"></label>' +
+      '<label>Nowe godz. min<input type="number" class="pfp-min" min="0" step="1" placeholder="—"></label>' +
+      '<label>Nowe godz. max<input type="number" class="pfp-max" min="0" step="1" placeholder="—"></label>' +
+      '<div style="grid-column:1 / -1;display:flex;gap:8px;padding-top:2px;">' +
+        '<button type="button" class="btn sm pfp-zapisz">Zapisz zmianę formy</button>' +
+        '<button type="button" class="btn sm secondary pfp-anuluj">Anuluj</button>' +
+      '</div>' +
+    '</div>' +
     '<div class="pk-flagi">' +
       // Zgoda na mniejszą liczbę dyżurów/nocek niż reszta zespołu - wyklucza osobę
       // z reguły W18 (sprawiedliwy rozkład dyżurów, patrz domain/grafik.js), tak jak
@@ -357,37 +372,76 @@ function wierszPracownika(p, pokazPolaMain) {
     karta.querySelector('.p-sw-jednostka').disabled = !jestEtat;
     karta.querySelector('.p-op-jednostka').disabled = !jestEtat;
   });
-  karta.querySelector('.p-forma-historia-btn').addEventListener('click', () => zmienFormeOdDaty(karta));
+  // Panel "⏱ od daty…" - otwiera/zamyka + reaguje na zmianę formy WEWNĄTRZ panelu
+  // (analogicznie do głównego pola Forma - przełącza Etat vs Godz. min/max).
+  const panelHistoria = karta.querySelector('.pk-forma-panel');
+  karta.querySelector('.p-forma-historia-btn').addEventListener('click', () => otworzPanelHistoriaFormy(karta));
+  karta.querySelector('.pfp-anuluj').addEventListener('click', () => { panelHistoria.hidden = true; });
+  karta.querySelector('.pfp-zapisz').addEventListener('click', () => zapiszZmianeFormy(karta));
+  karta.querySelector('.pfp-forma').addEventListener('change', (ev) => {
+    const jestEtat = ev.target.value === 'etat';
+    karta.querySelector('.pfp-etat').disabled = !jestEtat;
+    karta.querySelector('.pfp-min').disabled = jestEtat;
+    karta.querySelector('.pfp-max').disabled = jestEtat;
+  });
   return karta;
 }
 
-// zmienFormeOdDaty(karta) - dopisane 2026-09-06 na prośbę Piotra: "czasami dochodzi
-// zmiana formy zatrudnienia (...) powinno być możliwość zmiany z zachowaniem
-// wcześniejszego [rozliczenia] na okres w który było dane zatrudnienie". Zapisuje
-// DOTYCHCZASOWE wartości pól (Forma/Etat/Godz. min/max) jako segment historyczny
-// (patrz pracownik.historiaFormy w domain/grafik.js, grfPracownikNaDzien), a
-// następnie prosi o NOWE wartości i ustawia je jako aktualne (widoczne w kafelku) -
-// od podanej daty wsteczne miesiące nadal liczą się wg starej formy, od tej daty
-// (włącznie) wg nowej. Prosty przepływ przez prompt() (jak reszta appki - patrz
-// confirm() przy generatorze/publikacji) - NIE pozwala edytować/kasować już
-// zapisanych segmentów historii (ograniczenie znane, zaakceptowane jako v1: appka
-// dziś realnie potrzebuje obsłużyć jedną zmianę formy na osobę, nie pełen edytor).
-function zmienFormeOdDaty(karta) {
+// otworzPanelHistoriaFormy(karta) - pokazuje panel "⏱ od daty…" wypełniony
+// aktualnymi (dotychczasowymi) wartościami pól kafelka, z datą domyślną = dziś, i
+// datą minimalną = dzień po ostatnio zapisanej zmianie formy (jeśli już jakaś była).
+function otworzPanelHistoriaFormy(karta) {
+  const panel = karta.querySelector('.pk-forma-panel');
   const poleForma = karta.querySelector('.p-forma');
   const poleEtat = karta.querySelector('.p-etat');
   const poleMin = karta.querySelector('.p-godz-min');
   const poleMax = karta.querySelector('.p-godz-max');
+  const pfpData = panel.querySelector('.pfp-data');
+  const pfpForma = panel.querySelector('.pfp-forma');
+  const pfpEtat = panel.querySelector('.pfp-etat');
+  const pfpMin = panel.querySelector('.pfp-min');
+  const pfpMax = panel.querySelector('.pfp-max');
 
-  const dzisiaj = new Date().toISOString().slice(0, 10);
-  const dataZmiany = prompt(
-    'Od jakiej daty obowiązuje NOWA forma zatrudnienia?\n' +
-    '(miesiące SPRZED tej daty policzą się dalej wg DOTYCHCZASOWEJ formy: ' + poleForma.value + ')\n\n' +
-    'Format: RRRR-MM-DD', dzisiaj);
-  if (dataZmiany == null) return; // anulowano
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dataZmiany)) { alert('Nieprawidłowy format daty. Użyj RRRR-MM-DD.'); return; }
+  let historia;
+  try { historia = JSON.parse(karta.dataset.historiaFormy || '[]'); } catch (e) { historia = []; }
+  const ostatniaObowiazujeOd = historia.length ? historia[historia.length - 1].obowiazujeOd : null;
 
-  const nowaForma = (prompt('Nowa forma zatrudnienia od ' + dataZmiany + ':\netat / kontrakt / zlecenie', poleForma.value) || '').trim().toLowerCase();
-  if (['etat', 'kontrakt', 'zlecenie'].indexOf(nowaForma) === -1) { alert('Nieprawidłowa forma. Wpisz dokładnie: etat, kontrakt albo zlecenie.'); return; }
+  pfpData.value = new Date().toISOString().slice(0, 10);
+  if (ostatniaObowiazujeOd) pfpData.min = dodajDzien(ostatniaObowiazujeOd);
+  pfpForma.value = poleForma.value;
+  pfpEtat.value = poleEtat.value || 1;
+  pfpMin.value = poleMin.value || '';
+  pfpMax.value = poleMax.value || '';
+  pfpForma.dispatchEvent(new Event('change'));
+  panel.hidden = false;
+}
+
+function dodajDzien(dataYmd) {
+  const d = new Date(dataYmd + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+// zapiszZmianeFormy(karta) - dopisane 2026-09-06 na prośbę Piotra: "czasami dochodzi
+// zmiana formy zatrudnienia (...) powinno być możliwość zmiany z zachowaniem
+// wcześniejszego [rozliczenia] na okres w który było dane zatrudnienie". Zapisuje
+// DOTYCHCZASOWE wartości pól (Forma/Etat/Godz. min/max) jako segment historyczny
+// (patrz pracownik.historiaFormy w domain/grafik.js, grfPracownikNaDzien), a
+// wartości z panelu "⏱ od daty…" ustawia jako aktualne (widoczne w kafelku) - od
+// podanej daty wsteczne miesiące nadal liczą się wg starej formy, od tej daty
+// (włącznie) wg nowej. NIE pozwala edytować/kasować już zapisanych segmentów
+// historii (ograniczenie znane, zaakceptowane jako v1: appka dziś realnie potrzebuje
+// obsłużyć jedną zmianę formy na osobę, nie pełen edytor historii).
+function zapiszZmianeFormy(karta) {
+  const panel = karta.querySelector('.pk-forma-panel');
+  const poleForma = karta.querySelector('.p-forma');
+  const poleEtat = karta.querySelector('.p-etat');
+  const poleMin = karta.querySelector('.p-godz-min');
+  const poleMax = karta.querySelector('.p-godz-max');
+  const dataZmiany = panel.querySelector('.pfp-data').value;
+  const nowaForma = panel.querySelector('.pfp-forma').value;
+
+  if (!dataZmiany) { alert('Podaj datę, od której obowiązuje nowa forma.'); return; }
 
   // Zabezpiecz DOTYCHCZASOWE wartości jako segment historyczny - TYLKO jeśli to
   // PIERWSZA zmiana (historia jeszcze pusta). Jeśli historia już ma segmenty, to
@@ -410,21 +464,15 @@ function zmienFormeOdDaty(karta) {
   }
   const ostatniaObowiazujeOd = historia[historia.length - 1].obowiazujeOd;
   if (dataZmiany <= ostatniaObowiazujeOd) {
-    alert('Data zmiany (' + dataZmiany + ') musi być PÓŹNIEJSZA niż data ostatniej zapisanej zmiany formy (' + ostatniaObowiazujeOd + '). Anulowano.');
+    alert('Data zmiany (' + dataZmiany + ') musi być PÓŹNIEJSZA niż data ostatniej zapisanej zmiany formy (' + ostatniaObowiazujeOd + ').');
     return;
   }
 
-  let nowyEtat, nowyMin, nowyMax;
-  if (nowaForma === 'etat') {
-    nowyEtat = Number(prompt('Nowy wymiar etatu (0-1):', '1')) || 1;
-    nowyMin = undefined; nowyMax = undefined;
-  } else {
-    nowyEtat = 1;
-    const wpisMin = prompt('Nowe "Godz. min" (puste = brak):', '');
-    const wpisMax = prompt('Nowe "Godz. max" (puste = brak):', '');
-    nowyMin = wpisMin !== null && wpisMin !== '' ? Number(wpisMin) : undefined;
-    nowyMax = wpisMax !== null && wpisMax !== '' ? Number(wpisMax) : undefined;
-  }
+  const nowyEtat = nowaForma === 'etat' ? (Number(panel.querySelector('.pfp-etat').value) || 1) : 1;
+  const wpisMin = panel.querySelector('.pfp-min').value;
+  const wpisMax = panel.querySelector('.pfp-max').value;
+  const nowyMin = nowaForma !== 'etat' && wpisMin !== '' ? Number(wpisMin) : undefined;
+  const nowyMax = nowaForma !== 'etat' && wpisMax !== '' ? Number(wpisMax) : undefined;
   historia.push({ forma: nowaForma, etat: nowyEtat, zlecenieMinGodzin: nowyMin, zlecenieMaxGodzin: nowyMax, obowiazujeOd: dataZmiany });
 
   karta.dataset.historiaFormy = JSON.stringify(historia);
@@ -436,8 +484,8 @@ function zmienFormeOdDaty(karta) {
   poleMin.value = nowyMin == null ? '' : nowyMin;
   poleMax.value = nowyMax == null ? '' : nowyMax;
 
+  panel.hidden = true;
   renderInfoHistoriaFormy(karta);
-  alert('Zapisano historię formy zatrudnienia (widoczne pola pokazują teraz formę aktualną). Kliknij „Zapisz listę pracowników", żeby to utrwalić.');
 }
 
 function renderInfoHistoriaFormy(karta) {
