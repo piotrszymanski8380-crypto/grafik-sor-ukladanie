@@ -554,64 +554,67 @@ function opisSzczegolowFormy(seg) {
   return ' (max ' + max + 'h)';
 }
 
-// zbudujWierszHistorii(karta, idx, opcje) -> element DOM jednego PRZESZŁEGO segmentu
-// (nie ostatniego/"aktualnego" - ten renderuje się osobno w renderHistoriaFormy)
-// LUB - jeśli opcje.nowy===true - tymczasowy wiersz "dodaj nową zmianę" (jeszcze nie
-// zapisany do historii). Domyślnie tekst + [✎ edytuj] [🗑 usuń]; klik w ✎ zamienia na
-// formularz inline z [Zapisz]/[Anuluj].
-function zbudujWierszHistorii(karta, idx, opcje) {
-  opcje = opcje || {};
-  const wiersz = document.createElement('div');
-  wiersz.className = 'pk-hist-wiersz';
+// zbudujAkordeonZatrudnienia(karta, idx, numer, jestAktualny) -> element DOM
+// jednego okresu zatrudnienia jako ROZWIJANY AKORDEON: nagłówek "Zatrudnienie N:
+// od – do (lub "aktualnie"): forma" (klik = rozwiń/zwiń), a w środku te same pola
+// co "obecne" na kafelku (forma/etat/godziny min-max) + [Zapisz] + [Usuń ten
+// okres] (dla "aktualnie" - [Cofnij tę zmianę], czyli powrót do poprzedniego
+// okresu). Zastępuje dawny widok tekst+✎+🗑 - Piotr 2026-09-06: "mam inny
+// pomysł, i dane zatrudnienie rozwijane" (nawiązując do szkicu: "Zatrudnienie 1
+// od-do, forma / Dane jak obecne", najnowsze na górze).
+function zbudujAkordeonZatrudnienia(karta, idx, numer, jestAktualny) {
+  const box = document.createElement('div');
+  box.className = 'pk-hist-akordeon' + (jestAktualny ? ' pk-hist-akordeon-aktualny' : '');
 
-  function renderKompakt() {
+  const naglowek = document.createElement('div');
+  naglowek.className = 'pk-hist-akordeon-naglowek';
+  const chevron = document.createElement('i');
+  chevron.className = 'ti ti-chevron-down pk-hist-chevron';
+  const tytul = document.createElement('span');
+  tytul.className = 'pk-hist-tytul';
+  naglowek.append(chevron, tytul);
+
+  const body = document.createElement('div');
+  body.className = 'pk-hist-akordeon-body';
+  body.style.display = 'none';
+
+  function odswiezTytul() {
     const historia = czytajHistorieFormy(karta);
     const seg = historia[idx];
     const nastepny = historia[idx + 1];
-    const odPl = seg.obowiazujeOd === '2000-01-01' ? null : formatujDatePl(seg.obowiazujeOd);
-    const doPl = formatujDatePl(odejmijDzien(nastepny.obowiazujeOd));
-    wiersz.innerHTML = '';
-    const tekst = document.createElement('span');
-    tekst.textContent = (odPl ? odPl + ' – ' + doPl : 'do ' + doPl) + ': ' + seg.forma + opisSzczegolowFormy(seg);
-    const btnEdytuj = document.createElement('button');
-    btnEdytuj.type = 'button'; btnEdytuj.className = 'icon-btn'; btnEdytuj.title = 'Edytuj ten okres';
-    btnEdytuj.innerHTML = '<i class="ti ti-pencil"></i>';
-    btnEdytuj.addEventListener('click', renderEdycja);
-    const btnUsun = document.createElement('button');
-    btnUsun.type = 'button'; btnUsun.className = 'icon-btn'; btnUsun.title = 'Usuń ten okres';
-    btnUsun.innerHTML = '<i class="ti ti-trash"></i>';
-    btnUsun.addEventListener('click', () => {
-      if (!confirm('Usunąć okres „' + tekst.textContent + '"?')) return;
-      const h = czytajHistorieFormy(karta);
-      h.splice(idx, 1);
-      zapiszHistorieFormy(karta, h);
-      renderHistoriaFormy(karta);
-    });
-    wiersz.append(tekst, btnEdytuj, btnUsun);
+    const odPl = seg.obowiazujeOd === '2000-01-01' ? 'od początku' : formatujDatePl(seg.obowiazujeOd);
+    const doPl = jestAktualny ? 'aktualnie' : formatujDatePl(odejmijDzien(nastepny.obowiazujeOd));
+    tytul.innerHTML = '<strong>Zatrudnienie ' + numer + ':</strong> ' + odPl + ' – ' + doPl +
+      ' <span class="pk-forma-znacznik">' + (ETYKIETY_FORM_KADRA[seg.forma] || seg.forma) + '</span>' +
+      opisSzczegolowFormy(seg);
   }
+  odswiezTytul();
 
-  function renderEdycja() {
+  function zbudujCialo() {
+    body.innerHTML = '';
     const historia = czytajHistorieFormy(karta);
     const seg = historia[idx];
-    wiersz.innerHTML = '';
     const { wiersz: formularz, poleData, poleForma, poleEtat, poleMin, poleMax } = polaSegmentu(seg);
+
     const btnZapisz = document.createElement('button');
     btnZapisz.type = 'button'; btnZapisz.className = 'btn sm'; btnZapisz.textContent = 'Zapisz';
-    const btnAnuluj = document.createElement('button');
-    btnAnuluj.type = 'button'; btnAnuluj.className = 'btn sm secondary'; btnAnuluj.textContent = 'Anuluj';
+    const btnUsun = document.createElement('button');
+    btnUsun.type = 'button'; btnUsun.className = 'btn sm secondary';
+    btnUsun.textContent = jestAktualny ? 'Cofnij tę zmianę' : 'Usuń ten okres';
+
     btnZapisz.addEventListener('click', () => {
       const h = czytajHistorieFormy(karta);
       // Data jest ZAWSZE wymagana (nawet dla najstarszego, pierwszego okresu) - Piotr
       // 2026-09-06: "przy wpisywaniu powinno być wymuszone do kiedy, jak nie będzie
       // podane to nie można wprowadzić danych". Stare wpisy z sentinelem 2000-01-01
-      // (sprzed tej zmiany) nadal się WYŚWIETLAJĄ poprawnie (patrz renderKompakt) -
+      // (sprzed tej zmiany) nadal się WYŚWIETLAJĄ poprawnie (patrz odswiezTytul) -
       // ale jeśli admin otworzy taki wpis do edycji, musi już podać prawdziwą datę.
       const nowaData = poleData.value;
       if (!nowaData) { alert('Podaj datę, od której obowiązuje ten okres.'); return; }
       const poprzedniaData = idx > 0 ? h[idx - 1].obowiazujeOd : null;
-      const nastepnaData = h[idx + 1].obowiazujeOd;
+      const nastepnaData = h[idx + 1] ? h[idx + 1].obowiazujeOd : null;
       if (poprzedniaData && nowaData <= poprzedniaData) { alert('Data musi być późniejsza niż poprzedni okres (' + formatujDatePl(poprzedniaData) + ').'); return; }
-      if (nowaData >= nastepnaData) { alert('Data musi być wcześniejsza niż kolejny okres (' + formatujDatePl(nastepnaData) + ').'); return; }
+      if (nastepnaData && nowaData >= nastepnaData) { alert('Data musi być wcześniejsza niż kolejny okres (' + formatujDatePl(nastepnaData) + ').'); return; }
       const jestEtat = poleForma.value === 'etat';
       h[idx] = {
         forma: poleForma.value,
@@ -621,11 +624,40 @@ function zbudujWierszHistorii(karta, idx, opcje) {
         obowiazujeOd: nowaData,
       };
       zapiszHistorieFormy(karta, h);
+      if (jestAktualny) synchronizujAktualneZHistorii(karta);
       renderHistoriaFormy(karta);
     });
-    btnAnuluj.addEventListener('click', renderKompakt);
-    wiersz.append(formularz, btnZapisz, btnAnuluj);
+
+    btnUsun.addEventListener('click', () => {
+      if (jestAktualny) { cofnijZmianeFormy(karta); return; }
+      if (!confirm('Usunąć okres „Zatrudnienie ' + numer + '"?')) return;
+      const h = czytajHistorieFormy(karta);
+      h.splice(idx, 1);
+      zapiszHistorieFormy(karta, h);
+      renderHistoriaFormy(karta);
+    });
+
+    body.append(formularz, btnZapisz, btnUsun);
   }
+  zbudujCialo();
+
+  naglowek.addEventListener('click', () => {
+    const rozwiniety = box.classList.toggle('rozwiniety');
+    body.style.display = rozwiniety ? 'block' : 'none';
+  });
+
+  box.append(naglowek, body);
+  return box;
+}
+
+// zbudujWierszHistorii(karta, -1, opcje) -> element DOM tymczasowego wiersza
+// "dodaj nową zmianę formy" (jeszcze nie zapisanego do historii). Same istniejące
+// okresy renderuje teraz zbudujAkordeonZatrudnienia() powyżej - ta funkcja
+// obsługuje już WYŁĄCZNIE dodawanie nowego wpisu (opcje.nowy zawsze true).
+function zbudujWierszHistorii(karta, idx, opcje) {
+  opcje = opcje || {};
+  const wiersz = document.createElement('div');
+  wiersz.className = 'pk-hist-wiersz';
 
   if (opcje.nowy && opcje.pierwszaZmiana) {
     // PIERWSZA zmiana w ogóle (historia jeszcze zupełnie pusta) - trzeba podać OBIE
@@ -718,17 +750,15 @@ function zbudujWierszHistorii(karta, idx, opcje) {
     });
     btnAnuluj.addEventListener('click', () => renderHistoriaFormy(karta));
     wiersz.append(formularz, btnZapisz, btnAnuluj);
-  } else {
-    renderKompakt();
   }
   return wiersz;
 }
 
-// renderHistoriaFormy(karta, opcje) - buduje CAŁĄ listę: "Aktualnie: ..." na samej
-// górze (+ przycisk cofnięcia, jeśli jest co cofać), potem PRZESZŁE okresy NAJNOWSZY
-// NA GÓRZE (Piotr: "na dole najstarsze zatrudnienie, a na górze najnowsze"), na
-// samym dole przycisk "+ Dodaj zmianę formy" (albo, jeśli opcje.nowyWiersz===true,
-// od razu pusty wiersz w trybie edycji zamiast tego przycisku).
+// renderHistoriaFormy(karta, opcje) - buduje CAŁĄ listę jako akordeony "Zatrudnienie
+// N" (patrz zbudujAkordeonZatrudnienia) NAJNOWSZE NA GÓRZE (Piotr: "na dole
+// najstarsze zatrudnienie, a na górze najnowsze"), na samym dole przycisk "+ Dodaj
+// zmianę formy" (albo, jeśli opcje.nowyWiersz===true, od razu pusty wiersz w
+// trybie edycji zamiast tego przycisku).
 function renderHistoriaFormy(karta, opcje) {
   opcje = opcje || {};
   const kontener = karta.querySelector('.pk-historia-formy');
@@ -750,25 +780,12 @@ function renderHistoriaFormy(karta, opcje) {
   naglowek.textContent = 'Historia formy zatrudnienia (najnowsze na górze):';
   kontener.appendChild(naglowek);
 
-  if (historia.length) {
-    const ostatni = historia[historia.length - 1];
-    const wierszAktualny = document.createElement('div');
-    wierszAktualny.className = 'pk-hist-wiersz pk-hist-aktualny';
-    const odPl = ostatni.obowiazujeOd === '2000-01-01' ? null : formatujDatePl(ostatni.obowiazujeOd);
-    const tekst = document.createElement('span');
-    tekst.innerHTML = '<strong>' + (odPl ? 'od ' + odPl : 'od początku') + ': ' + ostatni.forma + opisSzczegolowFormy(ostatni) + ' (aktualnie)</strong>';
-    wierszAktualny.appendChild(tekst);
-    const btnCofnij = document.createElement('button');
-    btnCofnij.type = 'button'; btnCofnij.className = 'icon-btn'; btnCofnij.title = 'Cofnij tę zmianę formy (przywróć poprzedni okres jako aktualny)';
-    btnCofnij.innerHTML = '<i class="ti ti-arrow-back-up"></i>';
-    btnCofnij.addEventListener('click', () => cofnijZmianeFormy(karta));
-    wierszAktualny.appendChild(btnCofnij);
-    kontener.appendChild(wierszAktualny);
-
-    // Przeszłe okresy (wszystko oprócz ostatniego) - NAJNOWSZE NA GÓRZE.
-    for (let idx = historia.length - 2; idx >= 0; idx--) {
-      kontener.appendChild(zbudujWierszHistorii(karta, idx));
-    }
+  // Każdy okres to osobny rozwijany akordeon "Zatrudnienie N" - numer 1 to
+  // najnowszy (na górze), rośnie w dół do najstarszego.
+  for (let idx = historia.length - 1; idx >= 0; idx--) {
+    const numer = historia.length - idx;
+    const jestAktualny = idx === historia.length - 1;
+    kontener.appendChild(zbudujAkordeonZatrudnienia(karta, idx, numer, jestAktualny));
   }
 
   if (opcje.nowyWiersz) {
