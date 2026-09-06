@@ -302,18 +302,22 @@ function wierszPracownika(p, pokazPolaMain, rozwiniety) {
       '<button type="button" class="icon-btn btn-usun-p" title="Usuń"><i class="ti ti-trash"></i></button>' +
     '</div>' +
     '<div class="pk-body">' +
+    // Sekcja formy zatrudnienia - UPROSZCZONA 2026-09-06 na prośbę Piotra ("dalej
+    // jest to skomplikowane, chcę to uprościć"): zamiast pól Forma/Etat/Godz.
+    // min-max/Od kiedy zawsze widocznych naraz (i powielonych względem Historii
+    // poniżej), pokazujemy jedno zwięzłe podsumowanie ("Zlecenie · 80-160h/mies. ·
+    // od 01.09.2026") + przycisk "Zmień formę zatrudnienia", który otwiera kreator
+    // krok-po-kroku (jedno pytanie na raz - patrz zbudujKreatorFormy niżej).
+    '<div class="pk-forma-sekcja">' +
+      '<div class="pk-forma-podsumowanie"></div>' +
+      '<button type="button" class="btn sm secondary btn-zmien-forme"><i class="ti ti-pencil"></i> Zmień formę zatrudnienia</button>' +
+      '<div class="pk-forma-kreator-slot"></div>' +
+    '</div>' +
     '<div class="pk-historia-formy"></div>' +
     '<div class="pk-pola">' +
-      '<label>Forma<select class="p-forma"><option value="etat"' + (p.forma === 'etat' ? ' selected' : '') + '>etat</option>' +
-        '<option value="kontrakt"' + (p.forma === 'kontrakt' ? ' selected' : '') + '>kontrakt</option>' +
-        '<option value="zlecenie"' + (p.forma === 'zlecenie' ? ' selected' : '') + '>zlecenie</option></select></label>' +
-      '<label>Od kiedy<input type="date" class="p-forma-od" value="' + wartoscPoczatkuAktualnejFormy(p.historiaFormy) + '"' + ((p.historiaFormy || []).length ? '' : ' disabled') + ' title="Data, od której obowiązuje aktualna forma zatrudnienia - uzupełnia się/zmienia razem z Historią poniżej"></label>' +
-      '<label>Etat<input type="number" class="p-etat" value="' + (p.etat == null ? 1 : p.etat) + '" min="0" max="1" step="0.05"' + (p.forma !== 'etat' ? ' disabled' : '') + '></label>' +
       '<label>Grupa<select class="p-grupa"><option value="main"' + (p.grupa === 'main' ? ' selected' : '') + '>main</option>' +
         '<option value="opie"' + (p.grupa === 'opie' ? ' selected' : '') + '>opie</option></select></label>' +
       '<label>Stanowisko<select class="p-stanowisko">' + opcjeStanowiska(p.grupa, p.stanowisko) + '</select></label>' +
-      '<label>Godz. min<input type="number" class="p-godz-min" value="' + (p.zlecenieMinGodzin == null ? '' : p.zlecenieMinGodzin) + '" min="0" step="1" placeholder="—"' + (p.forma === 'etat' ? ' disabled' : '') + '></label>' +
-      '<label>Godz. max<input type="number" class="p-godz-max" value="' + (p.zlecenieMaxGodzin == null ? '' : p.zlecenieMaxGodzin) + '" min="0" step="1" placeholder="—"' + (p.forma === 'etat' ? ' disabled' : '') + '></label>' +
       // SW/Op - jednostka rocznego limitu (2 dni LUB 16 godz.) - dotyczy tylko etatu
       // (wytyczne_grafik_oddzialowa.docx pkt 3: "Wytyczne obejmują personel etatowy").
       '<label>SW limit<select class="p-sw-jednostka" title="Jednostka rocznego limitu siły wyższej (SW)"' + (p.forma !== 'etat' ? ' disabled' : '') + '>' +
@@ -322,6 +326,23 @@ function wierszPracownika(p, pokazPolaMain, rozwiniety) {
       '<label>Op limit<select class="p-op-jednostka" title="Jednostka rocznego limitu opieki nad dzieckiem (Op)"' + (p.forma !== 'etat' ? ' disabled' : '') + '>' +
         '<option value="dni"' + (p.opiekaJednostka !== 'godziny' ? ' selected' : '') + '>dni</option>' +
         '<option value="godziny"' + (p.opiekaJednostka === 'godziny' ? ' selected' : '') + '>godz.</option></select></label>' +
+    '</div>' +
+    // Pola formy/godzin trzymane są nadal jako prawdziwe elementy DOM (te same
+    // klasy co dawniej: p-forma/p-etat/p-godz-min/p-godz-max + NOWE dla kontraktu
+    // p-kontrakt-*) - reszta appki (zapis listy, filtrowanie itd.) czyta je bez
+    // zmian - ale są UKRYTE, bo jedynym sposobem ich zmiany jest już kreator wyżej
+    // (nie da się ich już edytować "na żywo" wprost w siatce).
+    '<div class="pk-pola-ukryte" style="display:none">' +
+      '<select class="p-forma"><option value="etat"' + (p.forma === 'etat' ? ' selected' : '') + '>etat</option>' +
+        '<option value="kontrakt"' + (p.forma === 'kontrakt' ? ' selected' : '') + '>kontrakt</option>' +
+        '<option value="zlecenie"' + (p.forma === 'zlecenie' ? ' selected' : '') + '>zlecenie</option></select>' +
+      '<input type="number" class="p-etat" value="' + (p.etat == null ? 1 : p.etat) + '" min="0" max="1" step="0.05">' +
+      '<input type="number" class="p-godz-min" value="' + (p.zlecenieMinGodzin == null ? '' : p.zlecenieMinGodzin) + '" min="0" step="1">' +
+      '<input type="number" class="p-godz-max" value="' + (p.zlecenieMaxGodzin == null ? '' : p.zlecenieMaxGodzin) + '" min="0" step="1">' +
+      '<input type="number" class="p-kontrakt-tydzien-min" value="' + (p.kontraktGodzTydzienMin == null ? '' : p.kontraktGodzTydzienMin) + '" min="0" step="1">' +
+      '<input type="number" class="p-kontrakt-tydzien-max" value="' + (p.kontraktGodzTydzienMax == null ? '' : p.kontraktGodzTydzienMax) + '" min="0" step="1">' +
+      '<input type="number" class="p-kontrakt-weekend-min" value="' + (p.kontraktGodzWeekendMin == null ? '' : p.kontraktGodzWeekendMin) + '" min="0" step="1">' +
+      '<input type="number" class="p-kontrakt-weekend-max" value="' + (p.kontraktGodzWeekendMax == null ? '' : p.kontraktGodzWeekendMax) + '" min="0" step="1">' +
     '</div>' +
     '<div class="pk-flagi">' +
       // Zgoda na mniejszą liczbę dyżurów/nocek niż reszta zespołu - wyklucza osobę
@@ -353,6 +374,7 @@ function wierszPracownika(p, pokazPolaMain, rozwiniety) {
   // grfPracownikNaDzien w domain/grafik.js.
   karta.dataset.historiaFormy = JSON.stringify(p.historiaFormy || []);
   renderHistoriaFormy(karta);
+  odswiezStanFormy(karta);
   karta.querySelector('.btn-usun-p').addEventListener('click', () => karta.remove());
   karta.querySelector('.p-nazwa').addEventListener('input', (ev) => {
     karta.querySelector('.pk-avatar').textContent = inicjaly(ev.target.value);
@@ -360,53 +382,12 @@ function wierszPracownika(p, pokazPolaMain, rozwiniety) {
   karta.querySelector('.p-grupa').addEventListener('change', (ev) => {
     karta.querySelector('.p-stanowisko').innerHTML = opcjeStanowiska(ev.target.value, '');
   });
-  karta.querySelector('.p-forma').addEventListener('change', (ev) => {
-    const jestEtat = ev.target.value === 'etat';
-    const polMin = karta.querySelector('.p-godz-min');
-    const polMax = karta.querySelector('.p-godz-max');
-    const polEtat = karta.querySelector('.p-etat');
-    polMin.disabled = jestEtat;
-    polMax.disabled = jestEtat;
-    if (jestEtat) { polMin.value = ''; polMax.value = ''; }
-    // Wymiar etatu (ułamek 0-1) ma sens TYLKO dla etatu - zlecenie/kontrakt liczą się
-    // wyłącznie godzinami z umowy (Godz. min/max wyżej), nie ułamkiem etatu (dopisane
-    // 2026-09-06 na zgłoszenie Piotra).
-    polEtat.disabled = !jestEtat;
-    karta.querySelector('.p-sw-jednostka').disabled = !jestEtat;
-    karta.querySelector('.p-op-jednostka').disabled = !jestEtat;
-    // Plakietka formy w zwiniętym nagłówku - patrz .pk-forma-znacznik (dopisane
-    // 2026-09-06 razem z widokiem listy/grupowaniem wg formy).
-    karta.querySelector('.pk-forma-znacznik').textContent = ev.target.value;
-    // Jeśli ta osoba ma już historię zmian formy, edycja pól Forma/Etat/Godz. min/max
-    // NA BIEŻĄCO aktualizuje NAJNOWSZY (ostatni) segment tej historii - patrz
-    // synchronizujHistorieZAktualnych() niżej - żeby "aktualnie" w historii nigdy nie
-    // rozjechało się z tym, co faktycznie widać w tych polach.
-    synchronizujHistorieZAktualnych(karta);
-  });
-  ['.p-etat', '.p-godz-min', '.p-godz-max'].forEach((sel) => {
-    karta.querySelector(sel).addEventListener('change', () => synchronizujHistorieZAktualnych(karta));
-  });
-  // "Od kiedy" - widoczna bezpośrednio przy Forma/Etat data początku AKTUALNEGO
-  // (ostatniego) segmentu historii - Piotr 2026-09-06: "powinno być od kiedy
-  // umowa i do kiedy". Zmiana tu nadpisuje TYLKO datę ostatniego segmentu (nie
-  // dodaje nowego) - do faktycznej zmiany formy służy "+ Dodaj zmianę formy" w
-  // Historii poniżej. Pole jest zablokowane, dopóki nie ma żadnej historii
-  // (appka nie zna wtedy żadnej daty początku).
-  karta.querySelector('.p-forma-od').addEventListener('change', (ev) => {
-    const h = czytajHistorieFormy(karta);
-    if (!h.length) return;
-    const nowaData = ev.target.value;
-    if (!nowaData) { alert('Podaj datę, od której obowiązuje aktualna forma.'); ev.target.value = wartoscPoczatkuAktualnejFormy(h); return; }
-    const poprzedniaData = h.length > 1 ? h[h.length - 2].obowiazujeOd : null;
-    if (poprzedniaData && nowaData <= poprzedniaData) {
-      alert('Data musi być późniejsza niż poprzedni okres (' + formatujDatePl(poprzedniaData) + ').');
-      ev.target.value = wartoscPoczatkuAktualnejFormy(h);
-      return;
-    }
-    h[h.length - 1].obowiazujeOd = nowaData;
-    zapiszHistorieFormy(karta, h);
-    renderHistoriaFormy(karta);
-  });
+  // "Zmień formę zatrudnienia" - jedyny sposób zmiany forma/etat/godziny min-max
+  // (pola te są teraz UKRYTE - patrz .pk-pola-ukryte w szablonie wyżej i komentarz
+  // przy zbudujKreatorFormy niżej). Otwiera kreator krok-po-kroku w miejscu
+  // przycisku - Piotr 2026-09-06: "dalej jest to skomplikowane, chcę to uprościć"
+  // -> "przedstaw to krok po kroku", potem (schemat .docx) doprecyzował kroki.
+  karta.querySelector('.btn-zmien-forme').addEventListener('click', () => otworzKreatorFormy(karta));
   // Zwijanie/rozwijanie kafelka kliknięciem w nagłówek (2026-09-06, patrz komentarz
   // przy wierszPracownika() wyżej) - z wyjątkiem kliknięcia w samo pole nazwiska
   // (edycja tekstu) albo przycisk usuwania, żeby te akcje nie przełączały zwinięcia.
@@ -435,36 +416,29 @@ function formatujDatePl(dataYmd) {
   return d + '.' + m + '.' + r;
 }
 
-// wartoscPoczatkuAktualnejFormy(historiaFormy) -> 'RRRR-MM-DD' | '' - data, od
-// której obowiązuje OSTATNI (czyli aktualny) segment historii, do pola "Od kiedy"
-// widocznego bezpośrednio przy "Forma"/"Etat" (nie trzeba rozwijać Historii, żeby
-// to zobaczyć) - Piotr 2026-09-06: "powinno być od kiedy umowa i do kiedy".
-// Sentinel '2000-01-01' (stare dane sprzed wymuszenia obowiązkowej daty) traktujemy
-// jak brak daty - pole zostaje puste zamiast pokazywać fałszywy rok 2000.
-function wartoscPoczatkuAktualnejFormy(historiaFormy) {
-  if (!historiaFormy || !historiaFormy.length) return '';
-  const ostatni = historiaFormy[historiaFormy.length - 1];
-  return ostatni.obowiazujeOd && ostatni.obowiazujeOd !== '2000-01-01' ? ostatni.obowiazujeOd : '';
-}
-
 // ============================================================================
-// Historia formy zatrudnienia - edytor w .pk-historia-formy (2026-09-06,
-// przebudowane na prośbę Piotra po kolejnych uwagach: kolejność od najnowszej na
-// górze, możliwość edycji/usunięcia zapisanego okresu, i żeby DODAWANIE nowej
-// zmiany było prostsze niż osobny popup ("⏱ od daty…") - teraz to jeden przycisk
-// "+ Dodaj zmianę formy" w tej samej liście.
+// Historia formy zatrudnienia + kreator krok-po-kroku (2026-09-06, PRZEBUDOWANE
+// na prośbę Piotra: "dalej jest to skomplikowane, chcę to uprościć" ->
+// "przedstaw to krok po kroku" -> dosłał "schemat dodawania kadry.docx" z
+// dokładnym schematem kroków i przyznał "1 i 2" (chce mieć MOŻLIWOŚĆ podania
+// stałej daty końca danego okresu, ale nie zawsze - "nie zawsze jest
+// przedłużenie umowy").
 //
 // Model: pracownik.historiaFormy = [{forma, etat, zlecenieMinGodzin,
-// zlecenieMaxGodzin, obowiazujeOd}, ...] ROSNĄCO wg obowiazujeOd (patrz
-// grfPracownikNaDzien w domain/grafik.js - ZAKŁADA tę kolejność). OSTATNI element
-// tej tablicy to zawsze to samo, co pola Forma/Etat/Godz. min/max na kafelku
-// ("aktualnie") - synchronizowane w OBIE strony:
-//   - edycja pól Forma/Etat/Godz. min/max na kafelku -> synchronizujHistorieZAktualnych()
-//     nadpisuje NIM ostatni element historii,
-//   - dodanie/edycja/usunięcie/cofnięcie w liście historii -> synchronizujAktualneZHistorii()
-//     nadpisuje NIMI pola na kafelku.
-// Wyświetlanie jest NAJNOWSZE NA GÓRZE (odwrotna kolejność niż w tablicy) - tak
-// Piotr poprosił ("na dole najstarsze zatrudnienie, a na górze najnowsze").
+// zlecenieMaxGodzin, kontraktGodzTydzienMin/Max (pon-pt), kontraktGodzWeekendMin/
+// Max (weekend/święta, TYLKO forma='kontrakt'), obowiazujeOd, planowanyKoniec?
+// (opcjonalne, informacyjne - NIE wpływa na domain/grafik.js, patrz odpowiedź
+// Piotra na AskUserQuestion: "tylko zapis/podgląd na razie")}, ...] ROSNĄCO wg
+// obowiazujeOd (grfPracownikNaDzien w domain/grafik.js zakłada tę kolejność).
+// OSTATNI element = to samo co UKRYTE pola .p-forma/.p-etat/.p-godz-min/
+// .p-godz-max/.p-kontrakt-* na kafelku (patrz .pk-pola-ukryte w wierszPracownika)
+// - odswiezStanFormy() utrzymuje je zsynchronizowane PO KAŻDEJ zmianie historii.
+//
+// JEDYNY sposób zmiany forma/etat/godziny to kreator otworzKreatorFormy()
+// (przycisk "Zmień formę zatrudnienia") - bez bezpośredniej edycji pól "na żywo"
+// jak dawniej, żeby nie powielać tych samych danych w dwóch miejscach naraz.
+// Wyświetlanie Historii jest NAJNOWSZE NA GÓRZE (Piotr: "na dole najstarsze
+// zatrudnienie, a na górze najnowsze").
 // ============================================================================
 
 function czytajHistorieFormy(karta) {
@@ -474,73 +448,112 @@ function zapiszHistorieFormy(karta, historia) {
   karta.dataset.historiaFormy = JSON.stringify(historia);
 }
 
-// Ustawia pola Forma/Etat/Godz. min/max na kafelku wg OSTATNIEGO segmentu historii
-// (jeśli historia jest pusta - nic nie robi, pola zostają jak są, historia po prostu
-// jeszcze nie istnieje).
-function synchronizujAktualneZHistorii(karta) {
-  const historia = czytajHistorieFormy(karta);
-  if (!historia.length) return;
-  const ostatni = historia[historia.length - 1];
-  const poleForma = karta.querySelector('.p-forma');
-  poleForma.value = ostatni.forma;
-  poleForma.dispatchEvent(new Event('change')); // przełącza disabled na Godz.min/max itd. + plakietkę
-  karta.querySelector('.p-etat').value = ostatni.etat == null ? 1 : ostatni.etat;
-  karta.querySelector('.p-godz-min').value = ostatni.zlecenieMinGodzin == null ? '' : ostatni.zlecenieMinGodzin;
-  karta.querySelector('.p-godz-max').value = ostatni.zlecenieMaxGodzin == null ? '' : ostatni.zlecenieMaxGodzin;
-  const poleOd = karta.querySelector('.p-forma-od');
-  poleOd.value = wartoscPoczatkuAktualnejFormy(historia);
-  poleOd.disabled = false;
+// nowaDataDomyslna(karta) -> dzień po ostatnim zapisanym segmencie (albo dziś,
+// gdyby ostatni segment miał datę w przyszłości) - domyślna wartość pola "Od
+// kiedy" w kreatorze.
+function nowaDataDomyslna(karta) {
+  const h = czytajHistorieFormy(karta);
+  const dzisiaj = new Date().toISOString().slice(0, 10);
+  if (!h.length) return dzisiaj;
+  const ostatnia = h[h.length - 1].obowiazujeOd;
+  return ostatnia >= dzisiaj ? dodajDzien(ostatnia) : dzisiaj;
 }
 
-// Odwrotny kierunek: pola na kafelku zostały zmienione ręcznie -> jeśli historia już
-// istnieje, nadpisz nimi jej OSTATNI segment (żeby "aktualnie" w historii nigdy nie
-// rozjechało się z tym, co faktycznie widać w polach Forma/Etat/Godz. min/max).
-function synchronizujHistorieZAktualnych(karta) {
+// opisSzczegolowFormy(seg) -> " (etat 0.75)" / " (80–160h)" / " (pon-pt 8–10h,
+// weekend/święta 4–6h, łącznie 80–160h)" / '' - dopisane 2026-09-06 na prośbę
+// Piotra: "każda forma za okres zatrudnienia [wymiar/godziny] powinno być też
+// widoczne", potem rozszerzone o rozbicie kontraktu wg "schemat dodawania
+// kadry.docx" (pon-pt / weekend-święta / łącznie - osobne zakresy godzin).
+function zakresGodzin(min, max) {
+  if (min == null && max == null) return null;
+  if (min != null && max != null) return min + '–' + max + 'h';
+  if (min != null) return 'min ' + min + 'h';
+  return 'max ' + max + 'h';
+}
+function opisSzczegolowFormy(seg) {
+  if (seg.forma === 'etat') {
+    return seg.etat != null ? ' (etat ' + seg.etat + ')' : '';
+  }
+  const czesci = [];
+  if (seg.forma === 'kontrakt') {
+    const tydzien = zakresGodzin(seg.kontraktGodzTydzienMin, seg.kontraktGodzTydzienMax);
+    if (tydzien) czesci.push('pon-pt ' + tydzien);
+    const weekend = zakresGodzin(seg.kontraktGodzWeekendMin, seg.kontraktGodzWeekendMax);
+    if (weekend) czesci.push('weekend/święta ' + weekend);
+  }
+  const laczne = zakresGodzin(seg.zlecenieMinGodzin, seg.zlecenieMaxGodzin);
+  if (laczne) czesci.push((seg.forma === 'kontrakt' && czesci.length ? 'łącznie ' : '') + laczne);
+  return czesci.length ? ' (' + czesci.join(', ') + ')' : '';
+}
+
+// odswiezStanFormy(karta) - ustawia UKRYTE pola .p-forma/.p-etat/.p-godz-min/
+// .p-godz-max/.p-kontrakt-* wg OSTATNIEGO segmentu historii (jeśli historia jest
+// pusta - pola zostają jak są, tzn. jak przy tworzeniu karty), odświeża plakietkę
+// formy w nagłówku, disabled na SW/Op limit, i podsumowanie tekstowe. Wołane po
+// KAŻDEJ zmianie, która może wpłynąć na "aktualną" formę (kreator, cofnięcie,
+// edycja/usunięcie w akordeonie).
+function odswiezStanFormy(karta) {
   const historia = czytajHistorieFormy(karta);
-  if (!historia.length) return;
-  const poleForma = karta.querySelector('.p-forma');
-  const jestEtat = poleForma.value === 'etat';
-  const ostatni = historia[historia.length - 1];
-  ostatni.forma = poleForma.value;
-  ostatni.etat = jestEtat ? (Number(karta.querySelector('.p-etat').value) || 1) : undefined;
-  const wpisMin = karta.querySelector('.p-godz-min').value;
-  const wpisMax = karta.querySelector('.p-godz-max').value;
-  ostatni.zlecenieMinGodzin = !jestEtat && wpisMin !== '' ? Number(wpisMin) : undefined;
-  ostatni.zlecenieMaxGodzin = !jestEtat && wpisMax !== '' ? Number(wpisMax) : undefined;
-  zapiszHistorieFormy(karta, historia);
-  renderHistoriaFormy(karta);
+  if (historia.length) {
+    const ostatni = historia[historia.length - 1];
+    karta.querySelector('.p-forma').value = ostatni.forma;
+    karta.querySelector('.p-etat').value = ostatni.etat == null ? 1 : ostatni.etat;
+    karta.querySelector('.p-godz-min').value = ostatni.zlecenieMinGodzin == null ? '' : ostatni.zlecenieMinGodzin;
+    karta.querySelector('.p-godz-max').value = ostatni.zlecenieMaxGodzin == null ? '' : ostatni.zlecenieMaxGodzin;
+    karta.querySelector('.p-kontrakt-tydzien-min').value = ostatni.kontraktGodzTydzienMin == null ? '' : ostatni.kontraktGodzTydzienMin;
+    karta.querySelector('.p-kontrakt-tydzien-max').value = ostatni.kontraktGodzTydzienMax == null ? '' : ostatni.kontraktGodzTydzienMax;
+    karta.querySelector('.p-kontrakt-weekend-min').value = ostatni.kontraktGodzWeekendMin == null ? '' : ostatni.kontraktGodzWeekendMin;
+    karta.querySelector('.p-kontrakt-weekend-max').value = ostatni.kontraktGodzWeekendMax == null ? '' : ostatni.kontraktGodzWeekendMax;
+  }
+  const forma = karta.querySelector('.p-forma').value;
+  karta.querySelector('.pk-forma-znacznik').textContent = forma;
+  karta.querySelector('.p-sw-jednostka').disabled = forma !== 'etat';
+  karta.querySelector('.p-op-jednostka').disabled = forma !== 'etat';
+  renderPodsumowanieFormy(karta);
+}
+
+// renderPodsumowanieFormy(karta) - tekst w .pk-forma-podsumowanie: "Zlecenie
+// (80-160h) · od 01.09.2026 · planowany koniec: 31.12.2026" - zastępuje dawne
+// zawsze-widoczne pola Forma/Etat/Godz.min/max (Piotr: "dalej jest to
+// skomplikowane, chcę to uprościć"). Bez historii (stary rekord sprzed tej
+// funkcji) - pokazuje to, co jest w ukrytych polach, bez daty.
+function renderPodsumowanieFormy(karta) {
+  const el = karta.querySelector('.pk-forma-podsumowanie');
+  if (!el) return;
+  const historia = czytajHistorieFormy(karta);
+  if (historia.length) {
+    const ostatni = historia[historia.length - 1];
+    const odPl = ostatni.obowiazujeOd === '2000-01-01' ? 'od początku' : 'od ' + formatujDatePl(ostatni.obowiazujeOd);
+    const koniec = ostatni.planowanyKoniec ? ' · planowany koniec: ' + formatujDatePl(ostatni.planowanyKoniec) : '';
+    el.innerHTML = '<strong>' + (ETYKIETY_FORM_KADRA[ostatni.forma] || ostatni.forma) + '</strong>' + opisSzczegolowFormy(ostatni) + ' · ' + odPl + koniec;
+  } else {
+    const forma = karta.querySelector('.p-forma').value;
+    const seg = {
+      forma,
+      etat: karta.querySelector('.p-etat').value !== '' ? Number(karta.querySelector('.p-etat').value) : undefined,
+      zlecenieMinGodzin: karta.querySelector('.p-godz-min').value !== '' ? Number(karta.querySelector('.p-godz-min').value) : undefined,
+      zlecenieMaxGodzin: karta.querySelector('.p-godz-max').value !== '' ? Number(karta.querySelector('.p-godz-max').value) : undefined,
+    };
+    el.innerHTML = '<strong>' + (ETYKIETY_FORM_KADRA[forma] || forma) + '</strong>' + opisSzczegolowFormy(seg) +
+      ' <span class="pk-podsumowanie-brak">(brak zapisanej daty początkowej - użyj „Zmień formę zatrudnienia”)</span>';
+  }
 }
 
 // cofnijZmianeFormy(karta) - usuwa OSTATNI (najnowszy) segment historii, przez co
-// poprzedni zapisany segment znów staje się "aktualny" (pola na kafelku wracają do
-// jego wartości). Do naprawiania pomyłki "kliknąłem/-ęłam dodaj zmianę formy przez
-// przypadek" bez babrania się w ręcznym przywracaniu starych wartości.
+// poprzedni zapisany segment znów staje się "aktualny". Do naprawiania pomyłki
+// "kliknąłem/-ęłam przez przypadek" bez babrania się w ręcznym przywracaniu.
 function cofnijZmianeFormy(karta) {
   const historia = czytajHistorieFormy(karta);
   if (!historia.length) return;
   if (!confirm('Cofnąć ostatnią zmianę formy? Poprzednio zapisany okres znów stanie się aktualny.')) return;
   historia.pop();
   zapiszHistorieFormy(karta, historia);
-  synchronizujAktualneZHistorii(karta);
+  odswiezStanFormy(karta);
   renderHistoriaFormy(karta);
 }
 
-// dodajNowySegmentHistorii(karta) - "+ Dodaj zmianę formy": pokazuje pusty wiersz w
-// trybie edycji (patrz zbudujWierszHistorii niżej). Jeśli to PIERWSZA zmiana w ogóle
-// (historia jeszcze pusta) - PRZED wypełnieniem NIC nie zapisuje samo z siebie
-// (dawniej: cichy sentinel "obowiązuje od 2000-01-01" = "od zawsze", którego Piotr
-// nie widział w historii i słusznie zauważył, że brakuje daty początku pierwszego
-// okresu) - zamiast tego formularz WYMAGA podania OBU dat: od kiedy obowiązywała
-// DOTYCHCZASOWA forma i od kiedy zaczyna obowiązywać NOWA (patrz opcje.pierwszaZmiana
-// w zbudujWierszHistorii) - dopisane 2026-09-06 na prośbę Piotra: "przy wpisywaniu
-// powinno być wymuszone do kiedy, jak nie będzie podane to nie można wprowadzić
-// danych".
-function dodajNowySegmentHistorii(karta) {
-  const historia = czytajHistorieFormy(karta);
-  renderHistoriaFormy(karta, { nowyWiersz: true, pierwszaZmiana: !historia.length });
-}
-
-/** 'RRRR-MM-DD' | undefined -> pole <input type=date> jako element DOM. */
+/** 'RRRR-MM-DD' | undefined -> pole <input type=date> jako element DOM (edycja
+ * ISTNIEJĄCEGO segmentu w akordeonie - patrz zbudujAkordeonZatrudnienia). */
 function polaSegmentu(seg) {
   const wiersz = document.createElement('div');
   wiersz.className = 'row pk-hist-edycja';
@@ -562,49 +575,48 @@ function polaSegmentu(seg) {
   poleEtat.value = seg && seg.etat != null ? seg.etat : 1;
   poleEtat.title = 'Wymiar etatu';
   const poleMin = document.createElement('input');
-  poleMin.type = 'number'; poleMin.className = 'pkh-min'; poleMin.min = '0'; poleMin.step = '1'; poleMin.placeholder = 'Godz. min';
+  poleMin.type = 'number'; poleMin.className = 'pkh-min'; poleMin.min = '0'; poleMin.step = '1'; poleMin.placeholder = 'Godz. min (łącznie)';
   poleMin.value = seg && seg.zlecenieMinGodzin != null ? seg.zlecenieMinGodzin : '';
   const poleMax = document.createElement('input');
-  poleMax.type = 'number'; poleMax.className = 'pkh-max'; poleMax.min = '0'; poleMax.step = '1'; poleMax.placeholder = 'Godz. max';
+  poleMax.type = 'number'; poleMax.className = 'pkh-max'; poleMax.min = '0'; poleMax.step = '1'; poleMax.placeholder = 'Godz. max (łącznie)';
   poleMax.value = seg && seg.zlecenieMaxGodzin != null ? seg.zlecenieMaxGodzin : '';
+  const poleTydzienMin = document.createElement('input');
+  poleTydzienMin.type = 'number'; poleTydzienMin.className = 'pkh-tydzien-min'; poleTydzienMin.min = '0'; poleTydzienMin.step = '1'; poleTydzienMin.placeholder = 'Godz. min pon-pt';
+  poleTydzienMin.value = seg && seg.kontraktGodzTydzienMin != null ? seg.kontraktGodzTydzienMin : '';
+  const poleTydzienMax = document.createElement('input');
+  poleTydzienMax.type = 'number'; poleTydzienMax.className = 'pkh-tydzien-max'; poleTydzienMax.min = '0'; poleTydzienMax.step = '1'; poleTydzienMax.placeholder = 'Godz. max pon-pt';
+  poleTydzienMax.value = seg && seg.kontraktGodzTydzienMax != null ? seg.kontraktGodzTydzienMax : '';
+  const poleWeekendMin = document.createElement('input');
+  poleWeekendMin.type = 'number'; poleWeekendMin.className = 'pkh-weekend-min'; poleWeekendMin.min = '0'; poleWeekendMin.step = '1'; poleWeekendMin.placeholder = 'Godz. min weekend/święta';
+  poleWeekendMin.value = seg && seg.kontraktGodzWeekendMin != null ? seg.kontraktGodzWeekendMin : '';
+  const poleWeekendMax = document.createElement('input');
+  poleWeekendMax.type = 'number'; poleWeekendMax.className = 'pkh-weekend-max'; poleWeekendMax.min = '0'; poleWeekendMax.step = '1'; poleWeekendMax.placeholder = 'Godz. max weekend/święta';
+  poleWeekendMax.value = seg && seg.kontraktGodzWeekendMax != null ? seg.kontraktGodzWeekendMax : '';
+  const poleKoniec = document.createElement('input');
+  poleKoniec.type = 'date'; poleKoniec.className = 'pkh-koniec';
+  if (seg && seg.planowanyKoniec) poleKoniec.value = seg.planowanyKoniec;
+  poleKoniec.title = 'Planowany koniec tego okresu (opcjonalnie, np. koniec kontraktu na czas określony) - zostaw puste, jeśli nieznany';
   function odswiezWidocznosc() {
-    const jestEtat = poleForma.value === 'etat';
-    poleEtat.style.display = jestEtat ? '' : 'none';
-    poleMin.style.display = jestEtat ? 'none' : '';
-    poleMax.style.display = jestEtat ? 'none' : '';
+    const forma = poleForma.value;
+    poleEtat.style.display = forma === 'etat' ? '' : 'none';
+    poleMin.style.display = forma === 'etat' ? 'none' : '';
+    poleMax.style.display = forma === 'etat' ? 'none' : '';
+    poleTydzienMin.style.display = forma === 'kontrakt' ? '' : 'none';
+    poleTydzienMax.style.display = forma === 'kontrakt' ? '' : 'none';
+    poleWeekendMin.style.display = forma === 'kontrakt' ? '' : 'none';
+    poleWeekendMax.style.display = forma === 'kontrakt' ? '' : 'none';
   }
   poleForma.addEventListener('change', odswiezWidocznosc);
   odswiezWidocznosc();
-  wiersz.append(poleData, poleForma, poleEtat, poleMin, poleMax);
-  return { wiersz, poleData, poleForma, poleEtat, poleMin, poleMax };
-}
-
-// opisSzczegolowFormy(seg) -> " (etat 0.75)" / " (80–160h)" / " (min 80h)" / " (max
-// 160h)" / '' - dopisane 2026-09-06 na prośbę Piotra: "każda forma za okres
-// zatrudnienia [wymiar/godziny] powinno być też widoczne" - w liście historii
-// (zarówno przeszłe okresy, jak i "aktualnie") nie widać było SAMEJ liczby -
-// tylko nazwy formy - a dla zlecenia/kontraktu różne okresy mogą mieć różne
-// wynegocjowane zakresy godzin, więc sama nazwa formy nie mówi wszystkiego.
-function opisSzczegolowFormy(seg) {
-  if (seg.forma === 'etat') {
-    return seg.etat != null ? ' (etat ' + seg.etat + ')' : '';
-  }
-  const min = seg.zlecenieMinGodzin;
-  const max = seg.zlecenieMaxGodzin;
-  if (min == null && max == null) return '';
-  if (min != null && max != null) return ' (' + min + '–' + max + 'h)';
-  if (min != null) return ' (min ' + min + 'h)';
-  return ' (max ' + max + 'h)';
+  wiersz.append(poleData, poleForma, poleEtat, poleTydzienMin, poleTydzienMax, poleWeekendMin, poleWeekendMax, poleMin, poleMax, poleKoniec);
+  return { wiersz, poleData, poleForma, poleEtat, poleMin, poleMax, poleTydzienMin, poleTydzienMax, poleWeekendMin, poleWeekendMax, poleKoniec };
 }
 
 // zbudujAkordeonZatrudnienia(karta, idx, numer, jestAktualny) -> element DOM
 // jednego okresu zatrudnienia jako ROZWIJANY AKORDEON: nagłówek "Zatrudnienie N:
-// od – do (lub "aktualnie"): forma" (klik = rozwiń/zwiń), a w środku te same pola
-// co "obecne" na kafelku (forma/etat/godziny min-max) + [Zapisz] + [Usuń ten
-// okres] (dla "aktualnie" - [Cofnij tę zmianę], czyli powrót do poprzedniego
-// okresu). Zastępuje dawny widok tekst+✎+🗑 - Piotr 2026-09-06: "mam inny
-// pomysł, i dane zatrudnienie rozwijane" (nawiązując do szkicu: "Zatrudnienie 1
-// od-do, forma / Dane jak obecne", najnowsze na górze).
+// od – do (lub "aktualnie"): forma" (klik = rozwiń/zwiń), a w środku pełna
+// edycja tego okresu (do poprawiania pomyłek bez usuwania+dodawania na nowo) +
+// [Zapisz] + [Usuń ten okres] (dla "aktualnie" - [Cofnij tę zmianę]).
 function zbudujAkordeonZatrudnienia(karta, idx, numer, jestAktualny) {
   const box = document.createElement('div');
   box.className = 'pk-hist-akordeon' + (jestAktualny ? ' pk-hist-akordeon-aktualny' : '');
@@ -627,9 +639,10 @@ function zbudujAkordeonZatrudnienia(karta, idx, numer, jestAktualny) {
     const nastepny = historia[idx + 1];
     const odPl = seg.obowiazujeOd === '2000-01-01' ? 'od początku' : formatujDatePl(seg.obowiazujeOd);
     const doPl = jestAktualny ? 'aktualnie' : formatujDatePl(odejmijDzien(nastepny.obowiazujeOd));
+    const koniec = jestAktualny && seg.planowanyKoniec ? ' · planowany koniec: ' + formatujDatePl(seg.planowanyKoniec) : '';
     tytul.innerHTML = '<strong>Zatrudnienie ' + numer + ':</strong> ' + odPl + ' – ' + doPl +
       ' <span class="pk-forma-znacznik">' + (ETYKIETY_FORM_KADRA[seg.forma] || seg.forma) + '</span>' +
-      opisSzczegolowFormy(seg);
+      opisSzczegolowFormy(seg) + koniec;
   }
   odswiezTytul();
 
@@ -637,7 +650,7 @@ function zbudujAkordeonZatrudnienia(karta, idx, numer, jestAktualny) {
     body.innerHTML = '';
     const historia = czytajHistorieFormy(karta);
     const seg = historia[idx];
-    const { wiersz: formularz, poleData, poleForma, poleEtat, poleMin, poleMax } = polaSegmentu(seg);
+    const { wiersz: formularz, poleData, poleForma, poleEtat, poleMin, poleMax, poleTydzienMin, poleTydzienMax, poleWeekendMin, poleWeekendMax, poleKoniec } = polaSegmentu(seg);
 
     const btnZapisz = document.createElement('button');
     btnZapisz.type = 'button'; btnZapisz.className = 'btn sm'; btnZapisz.textContent = 'Zapisz';
@@ -647,11 +660,6 @@ function zbudujAkordeonZatrudnienia(karta, idx, numer, jestAktualny) {
 
     btnZapisz.addEventListener('click', () => {
       const h = czytajHistorieFormy(karta);
-      // Data jest ZAWSZE wymagana (nawet dla najstarszego, pierwszego okresu) - Piotr
-      // 2026-09-06: "przy wpisywaniu powinno być wymuszone do kiedy, jak nie będzie
-      // podane to nie można wprowadzić danych". Stare wpisy z sentinelem 2000-01-01
-      // (sprzed tej zmiany) nadal się WYŚWIETLAJĄ poprawnie (patrz odswiezTytul) -
-      // ale jeśli admin otworzy taki wpis do edycji, musi już podać prawdziwą datę.
       const nowaData = poleData.value;
       if (!nowaData) { alert('Podaj datę, od której obowiązuje ten okres.'); return; }
       const poprzedniaData = idx > 0 ? h[idx - 1].obowiazujeOd : null;
@@ -659,15 +667,21 @@ function zbudujAkordeonZatrudnienia(karta, idx, numer, jestAktualny) {
       if (poprzedniaData && nowaData <= poprzedniaData) { alert('Data musi być późniejsza niż poprzedni okres (' + formatujDatePl(poprzedniaData) + ').'); return; }
       if (nastepnaData && nowaData >= nastepnaData) { alert('Data musi być wcześniejsza niż kolejny okres (' + formatujDatePl(nastepnaData) + ').'); return; }
       const jestEtat = poleForma.value === 'etat';
+      const jestKontrakt = poleForma.value === 'kontrakt';
       h[idx] = {
         forma: poleForma.value,
         etat: jestEtat ? (Number(poleEtat.value) || 1) : undefined,
         zlecenieMinGodzin: !jestEtat && poleMin.value !== '' ? Number(poleMin.value) : undefined,
         zlecenieMaxGodzin: !jestEtat && poleMax.value !== '' ? Number(poleMax.value) : undefined,
+        kontraktGodzTydzienMin: jestKontrakt && poleTydzienMin.value !== '' ? Number(poleTydzienMin.value) : undefined,
+        kontraktGodzTydzienMax: jestKontrakt && poleTydzienMax.value !== '' ? Number(poleTydzienMax.value) : undefined,
+        kontraktGodzWeekendMin: jestKontrakt && poleWeekendMin.value !== '' ? Number(poleWeekendMin.value) : undefined,
+        kontraktGodzWeekendMax: jestKontrakt && poleWeekendMax.value !== '' ? Number(poleWeekendMax.value) : undefined,
         obowiazujeOd: nowaData,
+        planowanyKoniec: poleKoniec.value || undefined,
       };
       zapiszHistorieFormy(karta, h);
-      if (jestAktualny) synchronizujAktualneZHistorii(karta);
+      if (jestAktualny) odswiezStanFormy(karta);
       renderHistoriaFormy(karta);
     });
 
@@ -693,152 +707,247 @@ function zbudujAkordeonZatrudnienia(karta, idx, numer, jestAktualny) {
   return box;
 }
 
-// zbudujWierszHistorii(karta, -1, opcje) -> element DOM tymczasowego wiersza
-// "dodaj nową zmianę formy" (jeszcze nie zapisanego do historii). Same istniejące
-// okresy renderuje teraz zbudujAkordeonZatrudnienia() powyżej - ta funkcja
-// obsługuje już WYŁĄCZNIE dodawanie nowego wpisu (opcje.nowy zawsze true).
-function zbudujWierszHistorii(karta, idx, opcje) {
+// otworzKreatorFormy(karta, opcje) - kreator KROK PO KROKU do dodania NOWEJ
+// zmiany formy zatrudnienia (jedyny sposób zmiany forma/etat/godziny - patrz
+// komentarz nad sekcją). Kroki: Forma -> Od kiedy (wymagane) + Do kiedy
+// (opcjonalnie, "planowany koniec" - Piotr: "nie zawsze jest przedłużenie
+// umowy") -> pola zależne od formy (etat: 1 pole; zlecenie: 1 krok/2 pola;
+// kontrakt: 3 kroki/2 pola wg "schemat dodawania kadry.docx": pon-pt, weekend/
+// święta, łącznie). opcje.nowyPracownik===true (świeżo dodana osoba, brak
+// jakiejkolwiek historii) -> zapisuje TYLKO ten jeden segment. W przeciwnym razie,
+// jeśli to PIERWSZA zmiana dla JUŻ ISTNIEJĄCEGO pracownika (historia pusta, ale
+// ma dotychczasową formę w ukrytych polach) - appka SAMA (bez pytania) dopisuje
+// "stary" segment z tych pól z sentinelem daty 2000-01-01 (wyświetla się jako
+// "od początku") - Piotr zrezygnował z pytania o tę datę, żeby uprościć.
+function otworzKreatorFormy(karta, opcje) {
   opcje = opcje || {};
-  const wiersz = document.createElement('div');
-  wiersz.className = 'pk-hist-wiersz';
+  const slot = karta.querySelector('.pk-forma-kreator-slot');
+  const btn = karta.querySelector('.btn-zmien-forme');
+  if (!slot || !btn) return;
+  btn.style.display = 'none';
+  slot.innerHTML = '';
 
-  if (opcje.nowy && opcje.pierwszaZmiana) {
-    // PIERWSZA zmiana w ogóle (historia jeszcze zupełnie pusta) - trzeba podać OBIE
-    // daty na raz: od kiedy obowiązywała DOTYCHCZASOWA forma (ta widoczna teraz w
-    // polach Forma/Etat/Godz. min/max kafelka) i od kiedy zaczyna obowiązywać NOWA -
-    // bez tego appka nie miałaby prawdziwej daty początku pierwszego okresu (Piotr
-    // 2026-09-06: "przy wpisywaniu powinno być wymuszone do kiedy, jak nie będzie
-    // podane to nie można wprowadzić danych"). OBIE daty są wymagane - przycisk
-    // "Zapisz" odmawia zapisu bez którejkolwiek z nich.
-    const formaObecna = karta.querySelector('.p-forma').value;
-    const etatObecny = karta.querySelector('.p-etat').value;
-    const minObecny = karta.querySelector('.p-godz-min').value;
-    const maxObecny = karta.querySelector('.p-godz-max').value;
+  const formaObecna = karta.querySelector('.p-forma').value;
+  const dane = { forma: formaObecna, dataOd: '', dataDo: '', etat: 1, min: '', max: '', tydzienMin: '', tydzienMax: '', weekendMin: '', weekendMax: '' };
 
-    const naglowekStary = document.createElement('div');
-    naglowekStary.className = 'pk-hist-etykieta';
-    naglowekStary.textContent = 'Od kiedy obowiązywała dotychczasowa forma (' + formaObecna + ')?';
-    const poleDataStara = document.createElement('input');
-    poleDataStara.type = 'date'; poleDataStara.className = 'pkh-data';
+  const kreator = document.createElement('div');
+  kreator.className = 'pk-hist-kreator';
+  const naglowek = document.createElement('div');
+  naglowek.className = 'pk-kreator-naglowek';
+  const pole = document.createElement('div');
+  pole.className = 'pk-kreator-pole';
+  const przyciski = document.createElement('div');
+  przyciski.className = 'pk-kreator-przyciski';
+  const btnWstecz = document.createElement('button');
+  btnWstecz.type = 'button'; btnWstecz.className = 'btn sm secondary'; btnWstecz.textContent = '← Wstecz';
+  const btnDalej = document.createElement('button');
+  btnDalej.type = 'button'; btnDalej.className = 'btn sm';
+  const btnAnuluj = document.createElement('button');
+  btnAnuluj.type = 'button'; btnAnuluj.className = 'btn sm secondary'; btnAnuluj.textContent = 'Anuluj';
 
-    const naglowekNowy = document.createElement('div');
-    naglowekNowy.className = 'pk-hist-etykieta';
-    naglowekNowy.textContent = 'Od kiedy obowiązuje nowa forma?';
-    const { wiersz: formularzNowy, poleData: poleDataNowa, poleForma: poleFormaNowa, poleEtat: poleEtatNowy, poleMin: poleMinNowy, poleMax: poleMaxNowy } = polaSegmentu({ forma: formaObecna });
-    poleDataNowa.value = new Date().toISOString().slice(0, 10);
-
-    const btnZapisz = document.createElement('button');
-    btnZapisz.type = 'button'; btnZapisz.className = 'btn sm'; btnZapisz.textContent = 'Zapisz obie daty';
-    const btnAnuluj = document.createElement('button');
-    btnAnuluj.type = 'button'; btnAnuluj.className = 'btn sm secondary'; btnAnuluj.textContent = 'Anuluj';
-    btnZapisz.addEventListener('click', () => {
-      if (!poleDataStara.value) { alert('Podaj datę, od której obowiązywała dotychczasowa forma (' + formaObecna + ').'); return; }
-      if (!poleDataNowa.value) { alert('Podaj datę, od której obowiązuje nowa forma.'); return; }
-      if (poleDataNowa.value <= poleDataStara.value) { alert('Data nowej formy musi być późniejsza niż data początku poprzedniej.'); return; }
-      const jestEtatNowa = poleFormaNowa.value === 'etat';
-      const h = [
-        {
-          forma: formaObecna,
-          etat: formaObecna === 'etat' ? (Number(etatObecny) || 1) : undefined,
-          zlecenieMinGodzin: formaObecna !== 'etat' && minObecny !== '' ? Number(minObecny) : undefined,
-          zlecenieMaxGodzin: formaObecna !== 'etat' && maxObecny !== '' ? Number(maxObecny) : undefined,
-          obowiazujeOd: poleDataStara.value,
-        },
-        {
-          forma: poleFormaNowa.value,
-          etat: jestEtatNowa ? (Number(poleEtatNowy.value) || 1) : undefined,
-          zlecenieMinGodzin: !jestEtatNowa && poleMinNowy.value !== '' ? Number(poleMinNowy.value) : undefined,
-          zlecenieMaxGodzin: !jestEtatNowa && poleMaxNowy.value !== '' ? Number(poleMaxNowy.value) : undefined,
-          obowiazujeOd: poleDataNowa.value,
-        },
-      ];
-      zapiszHistorieFormy(karta, h);
-      synchronizujAktualneZHistorii(karta);
-      renderHistoriaFormy(karta);
-    });
-    btnAnuluj.addEventListener('click', () => renderHistoriaFormy(karta));
-    wiersz.append(naglowekStary, poleDataStara, naglowekNowy, formularzNowy, btnZapisz, btnAnuluj);
-  } else if (opcje.nowy) {
-    // KOLEJNA zmiana (historia już ma co najmniej jeden segment) - trzeba podać tylko
-    // JEDNĄ datę: od kiedy zaczyna obowiązywać nowa forma (koniec poprzedniego okresu
-    // appka liczy sama - dzień wcześniej). Domyślna data: dzień po ostatnim zapisanym
-    // segmencie, albo dziś (gdyby ostatni segment miał datę w przyszłości).
-    const historia = czytajHistorieFormy(karta);
-    const ostatniaData = historia[historia.length - 1].obowiazujeOd;
-    const dzisiaj = new Date().toISOString().slice(0, 10);
-    const domyslnaData = ostatniaData >= dzisiaj ? dodajDzien(ostatniaData) : dzisiaj;
-    const { wiersz: formularz, poleData, poleForma, poleEtat, poleMin, poleMax } = polaSegmentu({ forma: karta.querySelector('.p-forma').value });
-    poleData.value = domyslnaData;
-    const btnZapisz = document.createElement('button');
-    btnZapisz.type = 'button'; btnZapisz.className = 'btn sm'; btnZapisz.textContent = 'Zapisz nową formę';
-    const btnAnuluj = document.createElement('button');
-    btnAnuluj.type = 'button'; btnAnuluj.className = 'btn sm secondary'; btnAnuluj.textContent = 'Anuluj';
-    btnZapisz.addEventListener('click', () => {
-      const h = czytajHistorieFormy(karta);
-      const nowaData = poleData.value;
-      const ostatnia = h[h.length - 1].obowiazujeOd;
-      if (!nowaData) { alert('Podaj datę, od której obowiązuje nowa forma.'); return; }
-      if (nowaData <= ostatnia) { alert('Data musi być późniejsza niż ostatnia zapisana zmiana (' + formatujDatePl(ostatnia) + ').'); return; }
-      const jestEtat = poleForma.value === 'etat';
-      h.push({
-        forma: poleForma.value,
-        etat: jestEtat ? (Number(poleEtat.value) || 1) : undefined,
-        zlecenieMinGodzin: !jestEtat && poleMin.value !== '' ? Number(poleMin.value) : undefined,
-        zlecenieMaxGodzin: !jestEtat && poleMax.value !== '' ? Number(poleMax.value) : undefined,
-        obowiazujeOd: nowaData,
-      });
-      zapiszHistorieFormy(karta, h);
-      synchronizujAktualneZHistorii(karta);
-      renderHistoriaFormy(karta);
-    });
-    btnAnuluj.addEventListener('click', () => renderHistoriaFormy(karta));
-    wiersz.append(formularz, btnZapisz, btnAnuluj);
+  function zamknij() {
+    slot.innerHTML = '';
+    btn.style.display = '';
   }
-  return wiersz;
+  btnAnuluj.addEventListener('click', zamknij);
+
+  let krok = 0;
+  let waliduj = null;
+
+  // Lista kroków budowana NA NOWO przy każdym renderKrok(), bo kroki godzinowe
+  // zależą od formy wybranej w pierwszym kroku.
+  function listaKrokow() {
+    const kroki = [];
+    kroki.push({
+      etykieta: 'Jaka forma zatrudnienia?',
+      zbuduj(kontener) {
+        const sel = document.createElement('select');
+        ['etat', 'kontrakt', 'zlecenie'].forEach((f) => {
+          const opt = document.createElement('option');
+          opt.value = f; opt.textContent = f;
+          if (f === dane.forma) opt.selected = true;
+          sel.appendChild(opt);
+        });
+        sel.addEventListener('change', () => { dane.forma = sel.value; });
+        kontener.appendChild(sel);
+        return () => { dane.forma = sel.value; return true; };
+      },
+    });
+    kroki.push({
+      etykieta: 'Od kiedy - i do kiedy (jeśli znane) - obowiązuje ta forma?',
+      zbuduj(kontener) {
+        const etOd = document.createElement('label');
+        etOd.className = 'pk-kreator-etykieta-pola'; etOd.textContent = 'Od kiedy';
+        const inpOd = document.createElement('input');
+        inpOd.type = 'date';
+        inpOd.value = dane.dataOd || nowaDataDomyslna(karta);
+        dane.dataOd = inpOd.value;
+        inpOd.addEventListener('input', () => { dane.dataOd = inpOd.value; });
+        const etDo = document.createElement('label');
+        etDo.className = 'pk-kreator-etykieta-pola'; etDo.textContent = 'Do kiedy (opcjonalnie)';
+        const inpDo = document.createElement('input');
+        inpDo.type = 'date';
+        inpDo.value = dane.dataDo || '';
+        inpDo.addEventListener('input', () => { dane.dataDo = inpDo.value; });
+        kontener.append(etOd, inpOd, etDo, inpDo);
+        return () => {
+          if (!inpOd.value) { alert('Podaj datę, od której obowiązuje ta forma.'); return false; }
+          const h = czytajHistorieFormy(karta);
+          if (h.length) {
+            const ostatnia = h[h.length - 1].obowiazujeOd;
+            if (inpOd.value <= ostatnia) { alert('Data musi być późniejsza niż ostatnia zapisana zmiana (' + formatujDatePl(ostatnia) + ').'); return false; }
+          }
+          if (inpDo.value && inpDo.value <= inpOd.value) { alert('Data końca musi być późniejsza niż data początku.'); return false; }
+          dane.dataOd = inpOd.value;
+          dane.dataDo = inpDo.value;
+          return true;
+        };
+      },
+    });
+    if (dane.forma === 'etat') {
+      kroki.push({
+        etykieta: 'Jaki wymiar etatu?',
+        zbuduj(kontener) {
+          const inp = document.createElement('input');
+          inp.type = 'number'; inp.min = '0'; inp.max = '1'; inp.step = '0.05';
+          inp.value = dane.etat || 1;
+          inp.addEventListener('input', () => { dane.etat = inp.value; });
+          kontener.appendChild(inp);
+          return () => { dane.etat = Number(inp.value) || 1; return true; };
+        },
+      });
+    } else if (dane.forma === 'zlecenie') {
+      kroki.push({
+        etykieta: 'Ile godzin miesięcznie (min–max)?',
+        zbuduj(kontener) {
+          const inpMin = document.createElement('input');
+          inpMin.type = 'number'; inpMin.min = '0'; inpMin.placeholder = 'Godz. min'; inpMin.value = dane.min || '';
+          const inpMax = document.createElement('input');
+          inpMax.type = 'number'; inpMax.min = '0'; inpMax.placeholder = 'Godz. max'; inpMax.value = dane.max || '';
+          kontener.append(inpMin, inpMax);
+          return () => { dane.min = inpMin.value; dane.max = inpMax.value; return true; };
+        },
+      });
+    } else {
+      // kontrakt - wg "schemat dodawania kadry.docx": 3 kroki po 2 pola. Tylko
+      // zapis/podgląd na razie - appka NIE pilnuje ich żadną regułą (Piotr
+      // potwierdził przez AskUserQuestion 2026-09-06).
+      kroki.push({
+        etykieta: 'Godziny w dni robocze pon-pt (min–max)?',
+        zbuduj(kontener) {
+          const inpMin = document.createElement('input');
+          inpMin.type = 'number'; inpMin.min = '0'; inpMin.placeholder = 'Godz. min pon-pt'; inpMin.value = dane.tydzienMin || '';
+          const inpMax = document.createElement('input');
+          inpMax.type = 'number'; inpMax.min = '0'; inpMax.placeholder = 'Godz. max pon-pt'; inpMax.value = dane.tydzienMax || '';
+          kontener.append(inpMin, inpMax);
+          return () => { dane.tydzienMin = inpMin.value; dane.tydzienMax = inpMax.value; return true; };
+        },
+      });
+      kroki.push({
+        etykieta: 'Godziny w weekendy i święta (min–max)?',
+        zbuduj(kontener) {
+          const inpMin = document.createElement('input');
+          inpMin.type = 'number'; inpMin.min = '0'; inpMin.placeholder = 'Godz. min weekend/święta'; inpMin.value = dane.weekendMin || '';
+          const inpMax = document.createElement('input');
+          inpMax.type = 'number'; inpMax.min = '0'; inpMax.placeholder = 'Godz. max weekend/święta'; inpMax.value = dane.weekendMax || '';
+          kontener.append(inpMin, inpMax);
+          return () => { dane.weekendMin = inpMin.value; dane.weekendMax = inpMax.value; return true; };
+        },
+      });
+      kroki.push({
+        etykieta: 'Godziny łącznie miesięcznie (min–max)?',
+        zbuduj(kontener) {
+          const inpMin = document.createElement('input');
+          inpMin.type = 'number'; inpMin.min = '0'; inpMin.placeholder = 'Godz. min łącznie'; inpMin.value = dane.min || '';
+          const inpMax = document.createElement('input');
+          inpMax.type = 'number'; inpMax.min = '0'; inpMax.placeholder = 'Godz. max łącznie'; inpMax.value = dane.max || '';
+          kontener.append(inpMin, inpMax);
+          return () => { dane.min = inpMin.value; dane.max = inpMax.value; return true; };
+        },
+      });
+    }
+    return kroki;
+  }
+
+  function renderKrok() {
+    const kroki = listaKrokow();
+    if (krok >= kroki.length) krok = kroki.length - 1;
+    const k = kroki[krok];
+    naglowek.textContent = 'Krok ' + (krok + 1) + '/' + kroki.length + ': ' + k.etykieta;
+    pole.innerHTML = '';
+    waliduj = k.zbuduj(pole);
+    btnWstecz.style.display = krok === 0 ? 'none' : '';
+    btnDalej.textContent = krok === kroki.length - 1 ? 'Zapisz' : 'Dalej →';
+  }
+
+  btnWstecz.addEventListener('click', () => { krok--; renderKrok(); });
+  btnDalej.addEventListener('click', () => {
+    if (waliduj && !waliduj()) return;
+    const kroki = listaKrokow();
+    if (krok < kroki.length - 1) { krok++; renderKrok(); return; }
+    // Ostatni krok - zapisz.
+    const jestEtat = dane.forma === 'etat';
+    const jestKontrakt = dane.forma === 'kontrakt';
+    const nowySegment = {
+      forma: dane.forma,
+      etat: jestEtat ? (Number(dane.etat) || 1) : undefined,
+      zlecenieMinGodzin: !jestEtat && dane.min !== '' ? Number(dane.min) : undefined,
+      zlecenieMaxGodzin: !jestEtat && dane.max !== '' ? Number(dane.max) : undefined,
+      kontraktGodzTydzienMin: jestKontrakt && dane.tydzienMin !== '' ? Number(dane.tydzienMin) : undefined,
+      kontraktGodzTydzienMax: jestKontrakt && dane.tydzienMax !== '' ? Number(dane.tydzienMax) : undefined,
+      kontraktGodzWeekendMin: jestKontrakt && dane.weekendMin !== '' ? Number(dane.weekendMin) : undefined,
+      kontraktGodzWeekendMax: jestKontrakt && dane.weekendMax !== '' ? Number(dane.weekendMax) : undefined,
+      obowiazujeOd: dane.dataOd,
+      planowanyKoniec: dane.dataDo || undefined,
+    };
+    const h = czytajHistorieFormy(karta);
+    if (!h.length && !opcje.nowyPracownik) {
+      // PIERWSZA zmiana dla JUŻ ISTNIEJĄCEGO pracownika - dopisz "stary" segment
+      // z obecnych (ukrytych) pól, z sentinelem daty (appka NIE pyta o tę datę -
+      // Piotr: "chcę to uprościć"). Dla ZUPEŁNIE NOWEGO pracownika (opcje.
+      // nowyPracownik) pomijamy to - nie ma żadnej "dotychczasowej" formy do
+      // zachowania.
+      const formaStara = karta.querySelector('.p-forma').value;
+      const jestEtatStara = formaStara === 'etat';
+      h.push({
+        forma: formaStara,
+        etat: jestEtatStara ? (Number(karta.querySelector('.p-etat').value) || 1) : undefined,
+        zlecenieMinGodzin: !jestEtatStara && karta.querySelector('.p-godz-min').value !== '' ? Number(karta.querySelector('.p-godz-min').value) : undefined,
+        zlecenieMaxGodzin: !jestEtatStara && karta.querySelector('.p-godz-max').value !== '' ? Number(karta.querySelector('.p-godz-max').value) : undefined,
+        obowiazujeOd: '2000-01-01',
+      });
+    }
+    h.push(nowySegment);
+    zapiszHistorieFormy(karta, h);
+    odswiezStanFormy(karta);
+    renderHistoriaFormy(karta);
+    zamknij();
+  });
+
+  renderKrok();
+  przyciski.append(btnWstecz, btnDalej, btnAnuluj);
+  kreator.append(naglowek, pole, przyciski);
+  slot.appendChild(kreator);
 }
 
-// renderHistoriaFormy(karta, opcje) - buduje CAŁĄ listę jako akordeony "Zatrudnienie
-// N" (patrz zbudujAkordeonZatrudnienia) NAJNOWSZE NA GÓRZE (Piotr: "na dole
-// najstarsze zatrudnienie, a na górze najnowsze"), na samym dole przycisk "+ Dodaj
-// zmianę formy" (albo, jeśli opcje.nowyWiersz===true, od razu pusty wiersz w
-// trybie edycji zamiast tego przycisku).
-function renderHistoriaFormy(karta, opcje) {
-  opcje = opcje || {};
+// renderHistoriaFormy(karta) - buduje listę akordeonów "Zatrudnienie N" (patrz
+// zbudujAkordeonZatrudnienia) NAJNOWSZE NA GÓRZE. Pusta historia -> nic (dodanie
+// pierwszej zmiany to teraz przycisk "Zmień formę zatrudnienia" przy podsumowaniu,
+// nie osobny przycisk w tym panelu).
+function renderHistoriaFormy(karta) {
   const kontener = karta.querySelector('.pk-historia-formy');
   if (!kontener) return;
   const historia = czytajHistorieFormy(karta);
   kontener.innerHTML = '';
-  if (!historia.length && !opcje.nowyWiersz) {
-    const btnDodaj = document.createElement('button');
-    btnDodaj.type = 'button'; btnDodaj.className = 'btn sm secondary';
-    btnDodaj.innerHTML = '<i class="ti ti-plus"></i> Dodaj zmianę formy zatrudnienia';
-    btnDodaj.title = 'Np. osoba przeszła ze zlecenia na etat w trakcie zatrudnienia - appka zachowa poprawne rozliczenie miesięcy sprzed zmiany';
-    btnDodaj.addEventListener('click', () => dodajNowySegmentHistorii(karta));
-    kontener.appendChild(btnDodaj);
-    return;
-  }
-
+  if (!historia.length) return;
   const naglowek = document.createElement('div');
   naglowek.className = 'pk-hist-naglowek';
   naglowek.textContent = 'Historia formy zatrudnienia (najnowsze na górze):';
   kontener.appendChild(naglowek);
-
-  // Każdy okres to osobny rozwijany akordeon "Zatrudnienie N" - numer 1 to
-  // najnowszy (na górze), rośnie w dół do najstarszego.
   for (let idx = historia.length - 1; idx >= 0; idx--) {
     const numer = historia.length - idx;
     const jestAktualny = idx === historia.length - 1;
     kontener.appendChild(zbudujAkordeonZatrudnienia(karta, idx, numer, jestAktualny));
-  }
-
-  if (opcje.nowyWiersz) {
-    kontener.appendChild(zbudujWierszHistorii(karta, -1, { nowy: true, pierwszaZmiana: opcje.pierwszaZmiana }));
-  } else {
-    const btnDodaj = document.createElement('button');
-    btnDodaj.type = 'button'; btnDodaj.className = 'btn sm secondary'; btnDodaj.style.marginTop = '4px';
-    btnDodaj.innerHTML = '<i class="ti ti-plus"></i> Dodaj zmianę formy';
-    btnDodaj.addEventListener('click', () => dodajNowySegmentHistorii(karta));
-    kontener.appendChild(btnDodaj);
   }
 }
 
@@ -908,6 +1017,10 @@ document.getElementById('btn-dodaj-pracownika').addEventListener('click', () => 
   filtrujKadre();
   karta.querySelector('.p-nazwa').focus();
   karta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  // Od razu otwórz kreator formy zatrudnienia - nowa osoba jeszcze nie ma żadnej
+  // historii ani formy do zachowania (opcje.nowyPracownik: true - patrz
+  // otworzKreatorFormy) - Piotr 2026-09-06, "schemat dodawania kadry.docx".
+  otworzKreatorFormy(karta, { nowyPracownik: true });
 });
 
 document.getElementById('btn-zapisz-pracownikow').addEventListener('click', async () => {
@@ -933,6 +1046,10 @@ document.getElementById('btn-zapisz-pracownikow').addEventListener('click', asyn
     const stanowisko = tr.querySelector('.p-stanowisko').value;
     const godzMin = tr.querySelector('.p-godz-min').value;
     const godzMax = tr.querySelector('.p-godz-max').value;
+    const kontraktTydzienMin = tr.querySelector('.p-kontrakt-tydzien-min').value;
+    const kontraktTydzienMax = tr.querySelector('.p-kontrakt-tydzien-max').value;
+    const kontraktWeekendMin = tr.querySelector('.p-kontrakt-weekend-min').value;
+    const kontraktWeekendMax = tr.querySelector('.p-kontrakt-weekend-max').value;
     const swJednostka = tr.querySelector('.p-sw-jednostka').value;
     const opJednostka = tr.querySelector('.p-op-jednostka').value;
     const dataZakonczenia = tr.querySelector('.p-data-zakonczenia').value;
@@ -947,6 +1064,15 @@ document.getElementById('btn-zapisz-pracownikow').addEventListener('click', asyn
       stanowisko: stanowisko || undefined,
       zlecenieMinGodzin: godzMin !== '' ? Number(godzMin) : undefined,
       zlecenieMaxGodzin: godzMax !== '' ? Number(godzMax) : undefined,
+      // kontraktGodz* - dopisane 2026-09-06 wg "schemat dodawania kadry.docx"
+      // (rozbicie godzin kontraktu na pon-pt / weekend-święta, niezależnie od
+      // zlecenieMinGodzin/Max, które dla kontraktu oznacza "łącznie") - TYLKO
+      // zapis/podgląd, appka NA RAZIE nie pilnuje ich żadną regułą (Piotr
+      // potwierdził przez AskUserQuestion).
+      kontraktGodzTydzienMin: kontraktTydzienMin !== '' ? Number(kontraktTydzienMin) : undefined,
+      kontraktGodzTydzienMax: kontraktTydzienMax !== '' ? Number(kontraktTydzienMax) : undefined,
+      kontraktGodzWeekendMin: kontraktWeekendMin !== '' ? Number(kontraktWeekendMin) : undefined,
+      kontraktGodzWeekendMax: kontraktWeekendMax !== '' ? Number(kontraktWeekendMax) : undefined,
       flagi: flagi.length ? flagi : undefined,
       optOutZgoda: (polOptout && polOptout.checked) || undefined,
       typyDyzuru: typyDyzuru.length ? typyDyzuru : undefined,

@@ -360,6 +360,29 @@ table.staff td input, table.staff td select { width: 100%; }
   border-top: 1px solid var(--border);
 }
 
+/* Kreator "dodaj zmianę formy" krok po kroku - dopisane 2026-09-06 na prośbę
+   Piotra po teście na żywo ("dalej jest to skomplikowane, chcę to uprościć" ->
+   "przedstaw to krok po kroku"): jedno pytanie na raz zamiast wszystkich pól
+   naraz. */
+.pk-hist-kreator {
+  border: 1px solid var(--accent, #2563eb); border-radius: 8px; padding: 12px; margin-top: 4px;
+  background: var(--accent-bg);
+}
+.pk-kreator-naglowek { font-weight: 600; font-size: 12.5px; margin-bottom: 8px; }
+.pk-kreator-pole { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; align-items: center; }
+.pk-kreator-pole input, .pk-kreator-pole select { font-size: 14px; padding: 7px 9px; min-width: 140px; }
+.pk-kreator-przyciski { display: flex; gap: 8px; }
+.pk-kreator-etykieta-pola { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; margin-right: -4px; }
+
+/* Podsumowanie aktualnej formy - zastępuje dawne zawsze-widoczne pola Forma/
+   Etat/Godz.min-max (2026-09-06, "dalej jest to skomplikowane, chcę to
+   uprościć"). */
+.pk-forma-sekcja { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.pk-forma-podsumowanie { font-size: 14px; }
+.pk-podsumowanie-brak { color: var(--muted); font-size: 12px; }
+.pk-forma-kreator-slot:empty { display: none; }
+.pk-forma-kreator-slot { width: 100%; }
+
 /* ---------- lista ostrzeżeń ---------- */
 ul.warn-list { list-style: none; margin: 0; padding: 0; }
 ul.warn-list li { padding: 10px 12px; border-radius: var(--radius); margin-bottom: 8px; font-size: 13px; border-left: 3px solid transparent; }
