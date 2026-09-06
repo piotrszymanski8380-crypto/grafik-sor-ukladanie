@@ -543,6 +543,24 @@ function polaSegmentu(seg) {
   return { wiersz, poleData, poleForma, poleEtat, poleMin, poleMax };
 }
 
+// opisSzczegolowFormy(seg) -> " (etat 0.75)" / " (80–160h)" / " (min 80h)" / " (max
+// 160h)" / '' - dopisane 2026-09-06 na prośbę Piotra: "każda forma za okres
+// zatrudnienia [wymiar/godziny] powinno być też widoczne" - w liście historii
+// (zarówno przeszłe okresy, jak i "aktualnie") nie widać było SAMEJ liczby -
+// tylko nazwy formy - a dla zlecenia/kontraktu różne okresy mogą mieć różne
+// wynegocjowane zakresy godzin, więc sama nazwa formy nie mówi wszystkiego.
+function opisSzczegolowFormy(seg) {
+  if (seg.forma === 'etat') {
+    return seg.etat != null ? ' (etat ' + seg.etat + ')' : '';
+  }
+  const min = seg.zlecenieMinGodzin;
+  const max = seg.zlecenieMaxGodzin;
+  if (min == null && max == null) return '';
+  if (min != null && max != null) return ' (' + min + '–' + max + 'h)';
+  if (min != null) return ' (min ' + min + 'h)';
+  return ' (max ' + max + 'h)';
+}
+
 // zbudujWierszHistorii(karta, idx, opcje) -> element DOM jednego PRZESZŁEGO segmentu
 // (nie ostatniego/"aktualnego" - ten renderuje się osobno w renderHistoriaFormy)
 // LUB - jeśli opcje.nowy===true - tymczasowy wiersz "dodaj nową zmianę" (jeszcze nie
@@ -561,7 +579,7 @@ function zbudujWierszHistorii(karta, idx, opcje) {
     const doPl = formatujDatePl(odejmijDzien(nastepny.obowiazujeOd));
     wiersz.innerHTML = '';
     const tekst = document.createElement('span');
-    tekst.textContent = (odPl ? odPl + ' – ' + doPl : 'do ' + doPl) + ': ' + seg.forma;
+    tekst.textContent = (odPl ? odPl + ' – ' + doPl : 'do ' + doPl) + ': ' + seg.forma + opisSzczegolowFormy(seg);
     const btnEdytuj = document.createElement('button');
     btnEdytuj.type = 'button'; btnEdytuj.className = 'icon-btn'; btnEdytuj.title = 'Edytuj ten okres';
     btnEdytuj.innerHTML = '<i class="ti ti-pencil"></i>';
@@ -683,7 +701,7 @@ function renderHistoriaFormy(karta, opcje) {
     wierszAktualny.className = 'pk-hist-wiersz pk-hist-aktualny';
     const odPl = ostatni.obowiazujeOd === '2000-01-01' ? null : formatujDatePl(ostatni.obowiazujeOd);
     const tekst = document.createElement('span');
-    tekst.innerHTML = '<strong>' + (odPl ? 'od ' + odPl : 'od początku') + ': ' + ostatni.forma + ' (aktualnie)</strong>';
+    tekst.innerHTML = '<strong>' + (odPl ? 'od ' + odPl : 'od początku') + ': ' + ostatni.forma + opisSzczegolowFormy(ostatni) + ' (aktualnie)</strong>';
     wierszAktualny.appendChild(tekst);
     const btnCofnij = document.createElement('button');
     btnCofnij.type = 'button'; btnCofnij.className = 'icon-btn'; btnCofnij.title = 'Cofnij tę zmianę formy (przywróć poprzedni okres jako aktualny)';
