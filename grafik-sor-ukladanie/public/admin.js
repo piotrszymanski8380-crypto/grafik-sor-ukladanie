@@ -482,26 +482,19 @@ function cofnijZmianeFormy(karta) {
   renderHistoriaFormy(karta);
 }
 
-// dodajNowySegmentHistorii(karta) - "+ Dodaj zmianę formy": zabezpiecza DOTYCHCZASOWE
-// (aktualne) wartości pól kafelka jako pierwszy segment historii, jeśli to PIERWSZA
-// zmiana w ogóle (sentinel "obowiązuje od 2000-01-01" = "obowiązywała od
-// zawsze/początku danych appki" - appka realnie działa od 2026 r., więc to
-// bezpieczna, odległa data-sentinel), po czym pokazuje PUSTY wiersz w trybie edycji
-// (patrz zbudujWierszHistorii niżej) do wypełnienia nowej, kolejnej formy.
+// dodajNowySegmentHistorii(karta) - "+ Dodaj zmianę formy": pokazuje pusty wiersz w
+// trybie edycji (patrz zbudujWierszHistorii niżej). Jeśli to PIERWSZA zmiana w ogóle
+// (historia jeszcze pusta) - PRZED wypełnieniem NIC nie zapisuje samo z siebie
+// (dawniej: cichy sentinel "obowiązuje od 2000-01-01" = "od zawsze", którego Piotr
+// nie widział w historii i słusznie zauważył, że brakuje daty początku pierwszego
+// okresu) - zamiast tego formularz WYMAGA podania OBU dat: od kiedy obowiązywała
+// DOTYCHCZASOWA forma i od kiedy zaczyna obowiązywać NOWA (patrz opcje.pierwszaZmiana
+// w zbudujWierszHistorii) - dopisane 2026-09-06 na prośbę Piotra: "przy wpisywaniu
+// powinno być wymuszone do kiedy, jak nie będzie podane to nie można wprowadzić
+// danych".
 function dodajNowySegmentHistorii(karta) {
   const historia = czytajHistorieFormy(karta);
-  const poleForma = karta.querySelector('.p-forma');
-  if (!historia.length) {
-    historia.push({
-      forma: poleForma.value,
-      etat: poleForma.value === 'etat' ? (Number(karta.querySelector('.p-etat').value) || 1) : undefined,
-      zlecenieMinGodzin: karta.querySelector('.p-godz-min').value !== '' ? Number(karta.querySelector('.p-godz-min').value) : undefined,
-      zlecenieMaxGodzin: karta.querySelector('.p-godz-max').value !== '' ? Number(karta.querySelector('.p-godz-max').value) : undefined,
-      obowiazujeOd: '2000-01-01',
-    });
-    zapiszHistorieFormy(karta, historia);
-  }
-  renderHistoriaFormy(karta, { nowyWiersz: true });
+  renderHistoriaFormy(karta, { nowyWiersz: true, pierwszaZmiana: !historia.length });
 }
 
 /** 'RRRR-MM-DD' | undefined -> pole <input type=date> jako element DOM. */
@@ -608,7 +601,12 @@ function zbudujWierszHistorii(karta, idx, opcje) {
     btnAnuluj.type = 'button'; btnAnuluj.className = 'btn sm secondary'; btnAnuluj.textContent = 'Anuluj';
     btnZapisz.addEventListener('click', () => {
       const h = czytajHistorieFormy(karta);
-      const nowaData = poleData.value || (idx === 0 ? '2000-01-01' : '');
+      // Data jest ZAWSZE wymagana (nawet dla najstarszego, pierwszego okresu) - Piotr
+      // 2026-09-06: "przy wpisywaniu powinno być wymuszone do kiedy, jak nie będzie
+      // podane to nie można wprowadzić danych". Stare wpisy z sentinelem 2000-01-01
+      // (sprzed tej zmiany) nadal się WYŚWIETLAJĄ poprawnie (patrz renderKompakt) -
+      // ale jeśli admin otworzy taki wpis do edycji, musi już podać prawdziwą datę.
+      const nowaData = poleData.value;
       if (!nowaData) { alert('Podaj datę, od której obowiązuje ten okres.'); return; }
       const poprzedniaData = idx > 0 ? h[idx - 1].obowiazujeOd : null;
       const nastepnaData = h[idx + 1].obowiazujeOd;
@@ -629,12 +627,69 @@ function zbudujWierszHistorii(karta, idx, opcje) {
     wiersz.append(formularz, btnZapisz, btnAnuluj);
   }
 
-  if (opcje.nowy) {
-    // Wiersz "dodaj nową zmianę formy" - domyślna data: dzień po ostatnim zapisanym
-    // segmencie (albo dziś, jeśli to pierwsza zmiana w ogóle i ostatni segment ma
-    // sentinel "od zawsze").
+  if (opcje.nowy && opcje.pierwszaZmiana) {
+    // PIERWSZA zmiana w ogóle (historia jeszcze zupełnie pusta) - trzeba podać OBIE
+    // daty na raz: od kiedy obowiązywała DOTYCHCZASOWA forma (ta widoczna teraz w
+    // polach Forma/Etat/Godz. min/max kafelka) i od kiedy zaczyna obowiązywać NOWA -
+    // bez tego appka nie miałaby prawdziwej daty początku pierwszego okresu (Piotr
+    // 2026-09-06: "przy wpisywaniu powinno być wymuszone do kiedy, jak nie będzie
+    // podane to nie można wprowadzić danych"). OBIE daty są wymagane - przycisk
+    // "Zapisz" odmawia zapisu bez którejkolwiek z nich.
+    const formaObecna = karta.querySelector('.p-forma').value;
+    const etatObecny = karta.querySelector('.p-etat').value;
+    const minObecny = karta.querySelector('.p-godz-min').value;
+    const maxObecny = karta.querySelector('.p-godz-max').value;
+
+    const naglowekStary = document.createElement('div');
+    naglowekStary.className = 'pk-hist-etykieta';
+    naglowekStary.textContent = 'Od kiedy obowiązywała dotychczasowa forma (' + formaObecna + ')?';
+    const poleDataStara = document.createElement('input');
+    poleDataStara.type = 'date'; poleDataStara.className = 'pkh-data';
+
+    const naglowekNowy = document.createElement('div');
+    naglowekNowy.className = 'pk-hist-etykieta';
+    naglowekNowy.textContent = 'Od kiedy obowiązuje nowa forma?';
+    const { wiersz: formularzNowy, poleData: poleDataNowa, poleForma: poleFormaNowa, poleEtat: poleEtatNowy, poleMin: poleMinNowy, poleMax: poleMaxNowy } = polaSegmentu({ forma: formaObecna });
+    poleDataNowa.value = new Date().toISOString().slice(0, 10);
+
+    const btnZapisz = document.createElement('button');
+    btnZapisz.type = 'button'; btnZapisz.className = 'btn sm'; btnZapisz.textContent = 'Zapisz obie daty';
+    const btnAnuluj = document.createElement('button');
+    btnAnuluj.type = 'button'; btnAnuluj.className = 'btn sm secondary'; btnAnuluj.textContent = 'Anuluj';
+    btnZapisz.addEventListener('click', () => {
+      if (!poleDataStara.value) { alert('Podaj datę, od której obowiązywała dotychczasowa forma (' + formaObecna + ').'); return; }
+      if (!poleDataNowa.value) { alert('Podaj datę, od której obowiązuje nowa forma.'); return; }
+      if (poleDataNowa.value <= poleDataStara.value) { alert('Data nowej formy musi być późniejsza niż data początku poprzedniej.'); return; }
+      const jestEtatNowa = poleFormaNowa.value === 'etat';
+      const h = [
+        {
+          forma: formaObecna,
+          etat: formaObecna === 'etat' ? (Number(etatObecny) || 1) : undefined,
+          zlecenieMinGodzin: formaObecna !== 'etat' && minObecny !== '' ? Number(minObecny) : undefined,
+          zlecenieMaxGodzin: formaObecna !== 'etat' && maxObecny !== '' ? Number(maxObecny) : undefined,
+          obowiazujeOd: poleDataStara.value,
+        },
+        {
+          forma: poleFormaNowa.value,
+          etat: jestEtatNowa ? (Number(poleEtatNowy.value) || 1) : undefined,
+          zlecenieMinGodzin: !jestEtatNowa && poleMinNowy.value !== '' ? Number(poleMinNowy.value) : undefined,
+          zlecenieMaxGodzin: !jestEtatNowa && poleMaxNowy.value !== '' ? Number(poleMaxNowy.value) : undefined,
+          obowiazujeOd: poleDataNowa.value,
+        },
+      ];
+      zapiszHistorieFormy(karta, h);
+      synchronizujAktualneZHistorii(karta);
+      renderHistoriaFormy(karta);
+    });
+    btnAnuluj.addEventListener('click', () => renderHistoriaFormy(karta));
+    wiersz.append(naglowekStary, poleDataStara, naglowekNowy, formularzNowy, btnZapisz, btnAnuluj);
+  } else if (opcje.nowy) {
+    // KOLEJNA zmiana (historia już ma co najmniej jeden segment) - trzeba podać tylko
+    // JEDNĄ datę: od kiedy zaczyna obowiązywać nowa forma (koniec poprzedniego okresu
+    // appka liczy sama - dzień wcześniej). Domyślna data: dzień po ostatnim zapisanym
+    // segmencie, albo dziś (gdyby ostatni segment miał datę w przyszłości).
     const historia = czytajHistorieFormy(karta);
-    const ostatniaData = historia.length ? historia[historia.length - 1].obowiazujeOd : '2000-01-01';
+    const ostatniaData = historia[historia.length - 1].obowiazujeOd;
     const dzisiaj = new Date().toISOString().slice(0, 10);
     const domyslnaData = ostatniaData >= dzisiaj ? dodajDzien(ostatniaData) : dzisiaj;
     const { wiersz: formularz, poleData, poleForma, poleEtat, poleMin, poleMax } = polaSegmentu({ forma: karta.querySelector('.p-forma').value });
@@ -646,9 +701,9 @@ function zbudujWierszHistorii(karta, idx, opcje) {
     btnZapisz.addEventListener('click', () => {
       const h = czytajHistorieFormy(karta);
       const nowaData = poleData.value;
-      const ostatnia = h.length ? h[h.length - 1].obowiazujeOd : null;
+      const ostatnia = h[h.length - 1].obowiazujeOd;
       if (!nowaData) { alert('Podaj datę, od której obowiązuje nowa forma.'); return; }
-      if (ostatnia && nowaData <= ostatnia) { alert('Data musi być późniejsza niż ostatnia zapisana zmiana (' + formatujDatePl(ostatnia) + ').'); return; }
+      if (nowaData <= ostatnia) { alert('Data musi być późniejsza niż ostatnia zapisana zmiana (' + formatujDatePl(ostatnia) + ').'); return; }
       const jestEtat = poleForma.value === 'etat';
       h.push({
         forma: poleForma.value,
@@ -717,7 +772,7 @@ function renderHistoriaFormy(karta, opcje) {
   }
 
   if (opcje.nowyWiersz) {
-    kontener.appendChild(zbudujWierszHistorii(karta, -1, { nowy: true }));
+    kontener.appendChild(zbudujWierszHistorii(karta, -1, { nowy: true, pierwszaZmiana: opcje.pierwszaZmiana }));
   } else {
     const btnDodaj = document.createElement('button');
     btnDodaj.type = 'button'; btnDodaj.className = 'btn sm secondary'; btnDodaj.style.marginTop = '4px';
