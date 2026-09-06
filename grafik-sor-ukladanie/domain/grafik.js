@@ -299,7 +299,7 @@ const GRF_KATALOG_REGUL = [
   { id: 'W14', waga: 'hard', opis: 'Minimalna liczba pielęgniarek (nie ratowników) w obsadzie main.' },
   { id: 'W15', waga: 'soft', opis: 'Zakres godzin min/max miesięcznie dla zlecenia/kontraktu.' },
   { id: 'W16', waga: 'soft', opis: 'Roczne limity siły wyższej (SW) i opieki nad dzieckiem (Op).' },
-  { id: 'W17', waga: 'soft', opis: 'Pilnowanie odbioru dnia wolnego za pracę w niedzielę/święto/sobotę (Wn/Ws).' },
+  { id: 'W17', waga: 'soft', opis: 'Pilnowanie odbioru dnia wolnego za pracę w niedzielę/święto/sobotę (Wn/Ws) - okno 6 dni wstecz / do końca okresu rozliczeniowego w przód.' },
   { id: 'W18', waga: 'soft', opis: 'Sprawiedliwy rozkład liczby dyżurów (D+N+DOBA) między etatowymi tej samej grupy w 2-miesięcznym okresie rozliczeniowym.' },
   { id: 'W20', waga: 'soft', opis: 'Co najmniej co 4. niedziela wolna od pracy (etat) - art. 151(12) KP.' },
 ];
@@ -345,6 +345,23 @@ function grfPoczatekOkresuRozliczeniowego(data) {
   var miesiac = Number(data.slice(5, 7));
   var startMiesiac = grfMiesiacStartuOkresu(miesiac);
   return rok + '-' + String(startMiesiac).padStart(2, '0') + '-01';
+}
+
+/**
+ * Ostatni dzień 2-miesięcznego okresu rozliczeniowego, do którego należy `data`.
+ * Dopisane 2026-09-06 do W17 (odbiór Wn/Ws) - patrz komentarz przy grfMaOdbiorWOknie.
+ */
+function grfKoniecOkresuRozliczeniowego(data) {
+  var rok = Number(data.slice(0, 4));
+  var miesiac = Number(data.slice(5, 7));
+  var koniecMiesiac = grfMiesiacStartuOkresu(miesiac) + 1;
+  var ostatniDzien = new Date(Date.UTC(rok, koniecMiesiac, 0)).getUTCDate();
+  return rok + '-' + String(koniecMiesiac).padStart(2, '0') + '-' + String(ostatniDzien).padStart(2, '0');
+}
+
+/** Liczba dni kalendarzowych między dwiema datami 'YYYY-MM-DD' (dataB - dataA). */
+function grfRoznicaDni(dataA, dataB) {
+  return Math.round((grfDataDoObiektu(dataB).getTime() - grfDataDoObiektu(dataA).getTime()) / 86400000);
 }
 
 /**
@@ -655,16 +672,18 @@ function grfDniIGodzinyKoduWRoku(roczne, pracownikId, kod, rok, etat) {
 }
 
 /**
- * grfMaOdbiorWOknie(indeksRoczny, pracownikId, dataBazowa, kodOdbioru, oknoDni) -> boolean
- * Czy w oknie [dataBazowa - oknoDni, dataBazowa + oknoDni] (kalendarzowo, może
+ * grfMaOdbiorWOknie(indeksRoczny, pracownikId, dataBazowa, kodOdbioru, dniWstecz, dniWprzod) -> boolean
+ * Czy w oknie [dataBazowa - dniWstecz, dataBazowa + dniWprzod] (kalendarzowo, może
  * wykraczać poza granice miesiąca) występuje u danej osoby kod `kodOdbioru` (np. 'Wn'
  * albo 'Ws') - do W17 (pilnowanie odbioru za pracę w niedzielę/święto/sobotę).
  * `indeksRoczny` musi być zbudowany z wpisów obejmujących CAŁY rok (patrz
  * grfDniIGodzinyKoduWRoku wyżej) - inaczej okno przycięte do jednego miesiąca dałoby
- * fałszywe ostrzeżenia przy dniach blisko początku/końca miesiąca.
+ * fałszywe ostrzeżenia przy dniach blisko początku/końca miesiąca. `dniWprzod`
+ * opcjonalny - jeśli pominięty, okno jest symetryczne (jak przed 2026-09-06).
  */
-function grfMaOdbiorWOknie(indeksRoczny, pracownikId, dataBazowa, kodOdbioru, oknoDni) {
-  for (var i = -oknoDni; i <= oknoDni; i++) {
+function grfMaOdbiorWOknie(indeksRoczny, pracownikId, dataBazowa, kodOdbioru, dniWstecz, dniWprzod) {
+  if (dniWprzod == null) dniWprzod = dniWstecz;
+  for (var i = -dniWstecz; i <= dniWprzod; i++) {
     var kodyDnia = grfKodyDnia(indeksRoczny, pracownikId, dodajDni(dataBazowa, i));
     if (kodyDnia.indexOf(kodOdbioru) !== -1) return true;
   }
@@ -801,24 +820,31 @@ function ostrzezeniaMiesiaca(wpisy, pracownicy, rok, miesiac, parametry, wpisyRo
         });
       }
 
-      // W17 - odbiór dnia wolnego za pracę w niedzielę/święto (Wn) w ciągu 6 dni
-      // kalendarzowych przed/po (art. 15111/15112 KP, wytyczne_grafik_oddzialowa.docx
-      // pkt 9), albo za pracę w sobotę (Ws) - to drugie to zwyczaj oddziału (nie ma
-      // wprost w KP), ale Piotr poprosił o pilnowanie tak samo jak Wn. MIĘKKA.
+      // W17 - odbiór dnia wolnego za pracę w niedzielę/święto (Wn), albo za pracę w
+      // sobotę (Ws) - to drugie to zwyczaj oddziału (nie ma wprost w KP), ale Piotr
+      // poprosił o pilnowanie tak samo jak Wn. MIĘKKA.
+      // POPRAWKA 2026-09-06 (Jan zauważył w REGULY-ukladania-grafiku-SOR.md): generator
+      // nigdy sam nie wpisuje Wn/Ws (0 razy w realnych testach), więc sztywne okno
+      // ±6 dni generowało ostrzeżenie na PRAWIE KAŻDY dyżur weekendowy/świąteczny -
+      // 79-91% wszystkich ostrzeżeń miękkich w testach Jana, zagłuszające resztę.
+      // Piotr wybrał: wydłużyć okno "do przodu" do końca 2-miesięcznego okresu
+      // rozliczeniowego (odbiór często i tak przychodzi później, ręcznie) - "do tyłu"
+      // zostaje 6 dni bez zmian (odbiór z wyprzedzeniem to rzadszy, ale realny przypadek).
       if (grfJestZmiana(kod)) {
         var dzienTyg = grfDataDoObiektu(data).getUTCDay();
+        var dniDoKoncaOkresu17 = Math.max(6, grfRoznicaDni(data, grfKoniecOkresuRozliczeniowego(data)));
         if (dzienTyg === 0 || jestSwietem(data, parametry.swieta)) {
-          if (!grfMaOdbiorWOknie(indeksRoczny, p.id, data, 'Wn', 6)) {
+          if (!grfMaOdbiorWOknie(indeksRoczny, p.id, data, 'Wn', 6, dniDoKoncaOkresu17)) {
             out.push({
               sev: 'soft', rule: 'W17', pracownikId: p.id, data: data,
-              komunikat: 'Praca w ' + (dzienTyg === 0 ? 'niedzielę' : 'święto') + ' bez odnotowanego odbioru (Wn) w oknie ±6 dni.',
+              komunikat: 'Praca w ' + (dzienTyg === 0 ? 'niedzielę' : 'święto') + ' bez odnotowanego odbioru (Wn) w ciągu 6 dni wstecz lub do końca okresu rozliczeniowego (' + grfKoniecOkresuRozliczeniowego(data) + ').',
             });
           }
         } else if (dzienTyg === 6) {
-          if (!grfMaOdbiorWOknie(indeksRoczny, p.id, data, 'Ws', 6)) {
+          if (!grfMaOdbiorWOknie(indeksRoczny, p.id, data, 'Ws', 6, dniDoKoncaOkresu17)) {
             out.push({
               sev: 'soft', rule: 'W17', pracownikId: p.id, data: data,
-              komunikat: 'Praca w sobotę bez odnotowanego odbioru (Ws) w oknie ±6 dni.',
+              komunikat: 'Praca w sobotę bez odnotowanego odbioru (Ws) w ciągu 6 dni wstecz lub do końca okresu rozliczeniowego (' + grfKoniecOkresuRozliczeniowego(data) + ').',
             });
           }
         }
@@ -1354,6 +1380,8 @@ if (typeof module !== 'undefined' && module.exports) {
     godzinyOkresuRozliczeniowego: godzinyOkresuRozliczeniowego,
     grfDniIGodzinyKoduWRoku: grfDniIGodzinyKoduWRoku,
     grfMaOdbiorWOknie: grfMaOdbiorWOknie,
+    grfKoniecOkresuRozliczeniowego: grfKoniecOkresuRozliczeniowego,
+    grfRoznicaDni: grfRoznicaDni,
     odm: odm,
     ostrzezeniaMiesiaca: ostrzezeniaMiesiaca,
     grfPodpowiedzCyklu: grfPodpowiedzCyklu,
