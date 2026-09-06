@@ -699,9 +699,10 @@ function odm(n, jeden, kilka, wiele) {
  *
  * `wpisyRoczne` (opcjonalny) - wpisy z CAŁEGO roku kalendarzowego `rok` (wszystkie 12
  * miesięcy), do reguł liczonych rocznie, nie w okresie rozliczeniowym: W9 (urlop na
- * żądanie), W16 (siła wyższa / opieka nad dzieckiem) i W17 (odbiór za niedzielę/
- * święto/sobotę, okno ±6 dni może wykraczać poza miesiąc). Jeśli pominięty, appka
- * dla tych trzech reguł używa samego `wpisy` - DZIAŁA, ale może dać wynik zaniżony
+ * żądanie), W11 (pula urlopu wypoczynkowego - dopisane 2026-09-06, patrz komentarz
+ * przy regule niżej), W16 (siła wyższa / opieka nad dzieckiem) i W17 (odbiór za
+ * niedzielę/święto/sobotę, okno ±6 dni może wykraczać poza miesiąc). Jeśli pominięty,
+ * appka dla tych reguł używa samego `wpisy` - DZIAŁA, ale może dać wynik zaniżony
  * (nie zobaczy nieobecności/odbiorów z miesięcy spoza `wpisy`) - patrz api/grafik.js
  * wpisyRoku().
  */
@@ -999,18 +1000,23 @@ function ostrzezeniaMiesiaca(wpisy, pracownicy, rok, miesiac, parametry, wpisyRo
       }
     }
 
-    // W11 - wymiar urlopu nie przekroczony (pula z modułu urlopy, jeśli podana - etat i
-    // kontrakt mają różne pule, patrz domain/urlopy.js: kontrakt 26 dni/rok, etat wg KP)
+    // W11 - wymiar urlopu nie przekroczony (pula roczna, jeśli podana dla pracownika).
+    // POPRAWKA 2026-09-06 (Jan zauważył w REGULY-ukladania-grafiku-SOR.md): liczyło
+    // dni UW tylko z `indeks` (wpisy PRZEKAZANE do tego wywołania - zwykle 1 miesiąc,
+    // czasem para miesięcy dla W5), a `p.pulaUrlopuDni` to pula ROCZNA (typowo 26) -
+    // pojedynczy miesiąc praktycznie nigdy nie ma tylu dni UW, więc reguła realnie
+    // nigdy się nie odzywała. Teraz liczy z `indeksRoczny` (CAŁY rok), tak jak W9/W16/
+    // W17 - patrz komentarz `wpisyRoczne` w nagłówku funkcji.
     if (typeof p.pulaUrlopuDni === 'number') {
       var dniUW = 0;
-      var poDacie = indeks[p.id] || {};
-      Object.keys(poDacie).forEach(function (data5) {
-        poDacie[data5].forEach(function (k) { if (k === 'UW') dniUW++; });
+      var poDacieRoczny11 = indeksRoczny[p.id] || {};
+      Object.keys(poDacieRoczny11).forEach(function (data5) {
+        poDacieRoczny11[data5].forEach(function (k) { if (k === 'UW') dniUW++; });
       });
       if (dniUW > p.pulaUrlopuDni) {
         out.push({
           sev: 'soft', rule: 'W11', pracownikId: p.id, data: dataOf(1),
-          komunikat: 'Wykorzystano ' + dniUW + ' dni UW, pula wynosi ' + p.pulaUrlopuDni + '.',
+          komunikat: 'Wykorzystano ' + dniUW + ' dni UW w roku, pula wynosi ' + p.pulaUrlopuDni + '.',
         });
       }
     }
@@ -1127,9 +1133,15 @@ function ostrzezeniaMiesiaca(wpisy, pracownicy, rok, miesiac, parametry, wpisyRo
   // dyżurze D i N, grupa main - MIĘKKA. Potwierdzone przez Piotra 2026-08-13. Konkretne
   // osoby z tą flagą to dane appki/oddziału (pracownik.flagi), nigdy nazwiska na sztywno
   // w tym pliku - patrz nagłówek pliku, sekcja "Model danych wejściowych".
+  // POPRAWKA 2026-09-06 (Jan zauważył w REGULY-ukladania-grafiku-SOR.md): reguła
+  // sprawdzała się dla KAŻDEGO dnia miesiąca, niezależnie od tego, czy w ogóle był
+  // tam jakikolwiek dyżur main wpisany - pusty/jeszcze nieukładany miesiąc generował
+  // dwa bezużyteczne ostrzeżenia na każdy dzień. Teraz sprawdzamy tylko dni, w
+  // których main FAKTYCZNIE ma jakąś obsadę na tej zmianie (obsadaDnia > 0).
   for (var d5 = 1; d5 <= dniWMiesiacu; d5++) {
     var data8 = dataOf(d5);
     ['D', 'N'].forEach(function (typ3) {
+      if (obsadaDnia(wpisy, 'main', typ3, data8, pracownicy) === 0) return;
       var jestStarszyAsystent = pracownicy.some(function (p) {
         if (p.grupa !== 'main' || !p.flagi || p.flagi.indexOf('starszy_asystent') === -1) return false;
         var kodyDnia = grfKodyDnia(indeks, p.id, data8);
