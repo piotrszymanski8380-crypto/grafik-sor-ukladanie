@@ -296,7 +296,7 @@ function wierszPracownika(p, pokazPolaMain) {
       '<label>Forma<select class="p-forma"><option value="etat"' + (p.forma === 'etat' ? ' selected' : '') + '>etat</option>' +
         '<option value="kontrakt"' + (p.forma === 'kontrakt' ? ' selected' : '') + '>kontrakt</option>' +
         '<option value="zlecenie"' + (p.forma === 'zlecenie' ? ' selected' : '') + '>zlecenie</option></select></label>' +
-      '<label>Etat<input type="number" class="p-etat" value="' + (p.etat == null ? 1 : p.etat) + '" min="0" max="1" step="0.05"></label>' +
+      '<label>Etat<input type="number" class="p-etat" value="' + (p.etat == null ? 1 : p.etat) + '" min="0" max="1" step="0.05"' + (p.forma !== 'etat' ? ' disabled' : '') + '></label>' +
       '<label>Grupa<select class="p-grupa"><option value="main"' + (p.grupa === 'main' ? ' selected' : '') + '>main</option>' +
         '<option value="opie"' + (p.grupa === 'opie' ? ' selected' : '') + '>opie</option></select></label>' +
       '<label>Stanowisko<select class="p-stanowisko">' + opcjeStanowiska(p.grupa, p.stanowisko) + '</select></label>' +
@@ -337,9 +337,14 @@ function wierszPracownika(p, pokazPolaMain) {
     const jestEtat = ev.target.value === 'etat';
     const polMin = karta.querySelector('.p-godz-min');
     const polMax = karta.querySelector('.p-godz-max');
+    const polEtat = karta.querySelector('.p-etat');
     polMin.disabled = jestEtat;
     polMax.disabled = jestEtat;
     if (jestEtat) { polMin.value = ''; polMax.value = ''; }
+    // Wymiar etatu (ułamek 0-1) ma sens TYLKO dla etatu - zlecenie/kontrakt liczą się
+    // wyłącznie godzinami z umowy (Godz. min/max wyżej), nie ułamkiem etatu (dopisane
+    // 2026-09-06 na zgłoszenie Piotra).
+    polEtat.disabled = !jestEtat;
     karta.querySelector('.p-sw-jednostka').disabled = !jestEtat;
     karta.querySelector('.p-op-jednostka').disabled = !jestEtat;
   });
