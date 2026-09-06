@@ -450,14 +450,17 @@ function blokada(pracownik, data, kod, wpisy, parametry) {
     return 'W3 - nazajutrz zaplanowana dniówka; odpoczynek 11 h nie zostanie zachowany (art. 97 UoDL).';
   }
 
-  if (pracownik.forma === 'etat') {
-    // W7 - po DOBIE (24 h) odpoczynek: bezpośrednio po niej nie D/DOBA (analogicznie do W3)
-    if (grfRegulaAktywna(parametry, 'W7') && (kod === 'D' || kod === 'DOBA') && wczoraj === 'DOBA') {
-      return 'W7 - po dyżurze DOBA wymagany odpoczynek co najmniej równy przepracowanym godzinom (art. 95/97 UoDL).';
-    }
-    if (grfRegulaAktywna(parametry, 'W7') && kod === 'DOBA' && jutro === 'DOBA') {
-      return 'W7 - dwie doby z rzędu bez odpoczynku między nimi (art. 95/97 UoDL).';
-    }
+  // W7 - po DOBIE (24 h) odpoczynek: bezpośrednio po niej nie D/DOBA (analogicznie do W3).
+  // POPRAWKA 2026-09-06 (Jan zauważył w REGULY-ukladania-grafiku-SOR.md): to sprawdzenie
+  // siedziało w bloku "if (pracownik.forma === 'etat')", a dwadzieścia linii niżej etat i
+  // tak ma zakaz brania DOBY w ogóle (patrz "W7 - DOBA tylko dla kontraktu/zlecenia" niżej) -
+  // więc warunek nigdy nie miał kogo sprawdzić. DOBĘ biorą wyłącznie kontrakt/zlecenie,
+  // więc to sprawdzenie MUSI działać bez względu na formę zatrudnienia.
+  if (grfRegulaAktywna(parametry, 'W7') && (kod === 'D' || kod === 'DOBA') && wczoraj === 'DOBA') {
+    return 'W7 - po dyżurze DOBA wymagany odpoczynek co najmniej równy przepracowanym godzinom (art. 95/97 UoDL).';
+  }
+  if (grfRegulaAktywna(parametry, 'W7') && kod === 'DOBA' && jutro === 'DOBA') {
+    return 'W7 - dwie doby z rzędu bez odpoczynku między nimi (art. 95/97 UoDL).';
   }
 
   // W6 - praca ponad 48 h/tydz. w okresie rozliczeniowym bez odnotowanej zgody opt-out
@@ -707,6 +710,63 @@ function ostrzezeniaMiesiaca(wpisy, pracownicy, rok, miesiac, parametry, wpisyRo
         out.push({
           sev: 'hard', rule: 'W3', pracownikId: p.id, data: dodajDni(data, 1),
           komunikat: 'Dniówka nazajutrz po nocce - odpoczynek dobowy poniżej 11 h.',
+        });
+      }
+
+      // W2, W7, W12 wykryte w istniejących danych - DOPISANE 2026-09-06 (Jan zauważył
+      // w REGULY-ukladania-grafiku-SOR.md: te trzy reguły twarde działały TYLKO przy
+      // zapisie pojedynczej komórki w blokada(), nigdy przy skanie miesiąca - czyli
+      // import gotowego grafiku z Excela i sama publikacja mogły przepuścić dwie zmiany
+      // jednego dnia, złamane zasady DOBY albo nockę osoby z flagą "bez nocek" bez
+      // jednego słowa ostrzeżenia). Sev 'hard', tak jak w blokada() - to te same reguły,
+      // tylko wykryte "po fakcie" zamiast zablokowane przy wpisywaniu.
+
+      // W2 - max jedna zmiana dziennie (D+N tego samego dnia tylko jako DOBA).
+      if (grfRegulaAktywna(parametry, 'W2')) {
+        var wszystkieZmianyDzis = grfKodyDnia(indeks, p.id, data).filter(grfJestZmiana);
+        var rozneZmianyDzis = wszystkieZmianyDzis.some(function (k) { return k !== wszystkieZmianyDzis[0]; });
+        if (wszystkieZmianyDzis.length > 1 && rozneZmianyDzis) {
+          out.push({
+            sev: 'hard', rule: 'W2', pracownikId: p.id, data: data,
+            komunikat: 'Więcej niż jedna różna zmiana tego samego dnia (' + wszystkieZmianyDzis.join('+') + ') - D+N zapisuje się jako DOBA.',
+          });
+        }
+      }
+
+      // W7 - zasady dyżurów DOBA (trzy niezależne sprawdzenia, jak w blokada()).
+      if (grfRegulaAktywna(parametry, 'W7')) {
+        if (kod === 'DOBA' && !parametry.stosujeDobe) {
+          out.push({
+            sev: 'hard', rule: 'W7', pracownikId: p.id, data: data,
+            komunikat: 'Dyżur DOBA, ale oddział nie stosuje dyżurów DOBA (parametr oddziału).',
+          });
+        }
+        if (kod === 'DOBA' && p.forma === 'etat') {
+          out.push({
+            sev: 'hard', rule: 'W7', pracownikId: p.id, data: data,
+            komunikat: 'Dyżur DOBA u osoby na etacie - DOBA dostępna tylko dla kontraktu/zlecenia.',
+          });
+        }
+        var wczorajKodW7 = grfGlownyKod(indeks, p.id, dodajDni(data, -1));
+        if ((kod === 'D' || kod === 'DOBA') && wczorajKodW7 === 'DOBA') {
+          out.push({
+            sev: 'hard', rule: 'W7', pracownikId: p.id, data: data,
+            komunikat: 'Zmiana zaraz po dyżurze DOBA - brak wymaganego odpoczynku (art. 95/97 UoDL).',
+          });
+        }
+        if (kod === 'DOBA' && jutro === 'DOBA') {
+          out.push({
+            sev: 'hard', rule: 'W7', pracownikId: p.id, data: data,
+            komunikat: 'Dwie doby z rzędu bez odpoczynku między nimi (art. 95/97 UoDL).',
+          });
+        }
+      }
+
+      // W12 - przeciwwskazania indywidualne (flaga "bez nocek").
+      if (grfRegulaAktywna(parametry, 'W12') && (kod === 'N' || kod === 'DOBA') && p.flagi && p.flagi.indexOf('bez_nocek') !== -1) {
+        out.push({
+          sev: 'hard', rule: 'W12', pracownikId: p.id, data: data,
+          komunikat: 'Dyżur nocny/DOBA u osoby z flagą "bez nocek" (orzeczenie/ciąża, art. 178 KP).',
         });
       }
 
