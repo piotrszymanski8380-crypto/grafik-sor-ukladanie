@@ -307,8 +307,8 @@ function wierszPracownika(p, pokazPolaMain, rozwiniety) {
       '<label>Forma<select class="p-forma"><option value="etat"' + (p.forma === 'etat' ? ' selected' : '') + '>etat</option>' +
         '<option value="kontrakt"' + (p.forma === 'kontrakt' ? ' selected' : '') + '>kontrakt</option>' +
         '<option value="zlecenie"' + (p.forma === 'zlecenie' ? ' selected' : '') + '>zlecenie</option></select></label>' +
+      '<label>Od kiedy<input type="date" class="p-forma-od" value="' + wartoscPoczatkuAktualnejFormy(p.historiaFormy) + '"' + ((p.historiaFormy || []).length ? '' : ' disabled') + ' title="Data, od której obowiązuje aktualna forma zatrudnienia - uzupełnia się/zmienia razem z Historią poniżej"></label>' +
       '<label>Etat<input type="number" class="p-etat" value="' + (p.etat == null ? 1 : p.etat) + '" min="0" max="1" step="0.05"' + (p.forma !== 'etat' ? ' disabled' : '') + '></label>' +
-      '<label>Zakończenie<input type="date" class="p-data-zakonczenia" value="' + (p.dataZakonczenia || '') + '" title="Ostatni dzień zatrudnienia - po tej dacie osoba znika z generatora grafiku (nie z Kadry ani z wcześniej zapisanego grafiku)"></label>' +
       '<label>Grupa<select class="p-grupa"><option value="main"' + (p.grupa === 'main' ? ' selected' : '') + '>main</option>' +
         '<option value="opie"' + (p.grupa === 'opie' ? ' selected' : '') + '>opie</option></select></label>' +
       '<label>Stanowisko<select class="p-stanowisko">' + opcjeStanowiska(p.grupa, p.stanowisko) + '</select></label>' +
@@ -336,6 +336,13 @@ function wierszPracownika(p, pokazPolaMain, rozwiniety) {
           '<label class="pk-flaga"><input type="checkbox" class="p-dyzur-noc"' + (typyDyzuru.indexOf('noc') !== -1 ? ' checked' : '') + '> Noc</label>' +
           '<label class="pk-flaga"><input type="checkbox" class="p-dyzur-tylko-dzien"' + (typyDyzuru.indexOf('tylko_dzien') !== -1 ? ' checked' : '') + '> Tylko dzień</label>' +
           '<label class="pk-flaga"><input type="checkbox" class="p-dyzur-doba"' + (typyDyzuru.indexOf('doba') !== -1 ? ' checked' : '') + '> Doba</label>') +
+    '</div>' +
+    // Zakończenie WSPÓŁPRACY (rezygnacja/zwolnienie) - CELOWO osobno, z dala od pól
+    // "Forma"/"Od kiedy" - to NIE to samo co zmiana formy zatrudnienia (ta ma swój
+    // panel "Historia formy zatrudnienia" wyżej). Piotr 2026-09-06: "zakończenie
+    // umowy powinno być osobno - bo to jak ktoś rezygnuje".
+    '<div class="pk-koniec-sekcja">' +
+      '<label>Zakończenie współpracy<input type="date" class="p-data-zakonczenia" value="' + (p.dataZakonczenia || '') + '" title="Ostatni dzień CAŁEGO zatrudnienia w oddziale (rezygnacja/zwolnienie) - po tej dacie osoba znika z generatora grafiku (nie z Kadry ani z wcześniej zapisanego grafiku). To NIE to samo, co zmiana formy zatrudnienia (np. ze zlecenia na etat) - do tego służy Historia formy zatrudnienia wyżej."></label>' +
     '</div>' +
     '</div>'; // zamyka .pk-body
   karta.dataset.id = p.id || '';
@@ -379,6 +386,27 @@ function wierszPracownika(p, pokazPolaMain, rozwiniety) {
   ['.p-etat', '.p-godz-min', '.p-godz-max'].forEach((sel) => {
     karta.querySelector(sel).addEventListener('change', () => synchronizujHistorieZAktualnych(karta));
   });
+  // "Od kiedy" - widoczna bezpośrednio przy Forma/Etat data początku AKTUALNEGO
+  // (ostatniego) segmentu historii - Piotr 2026-09-06: "powinno być od kiedy
+  // umowa i do kiedy". Zmiana tu nadpisuje TYLKO datę ostatniego segmentu (nie
+  // dodaje nowego) - do faktycznej zmiany formy służy "+ Dodaj zmianę formy" w
+  // Historii poniżej. Pole jest zablokowane, dopóki nie ma żadnej historii
+  // (appka nie zna wtedy żadnej daty początku).
+  karta.querySelector('.p-forma-od').addEventListener('change', (ev) => {
+    const h = czytajHistorieFormy(karta);
+    if (!h.length) return;
+    const nowaData = ev.target.value;
+    if (!nowaData) { alert('Podaj datę, od której obowiązuje aktualna forma.'); ev.target.value = wartoscPoczatkuAktualnejFormy(h); return; }
+    const poprzedniaData = h.length > 1 ? h[h.length - 2].obowiazujeOd : null;
+    if (poprzedniaData && nowaData <= poprzedniaData) {
+      alert('Data musi być późniejsza niż poprzedni okres (' + formatujDatePl(poprzedniaData) + ').');
+      ev.target.value = wartoscPoczatkuAktualnejFormy(h);
+      return;
+    }
+    h[h.length - 1].obowiazujeOd = nowaData;
+    zapiszHistorieFormy(karta, h);
+    renderHistoriaFormy(karta);
+  });
   // Zwijanie/rozwijanie kafelka kliknięciem w nagłówek (2026-09-06, patrz komentarz
   // przy wierszPracownika() wyżej) - z wyjątkiem kliknięcia w samo pole nazwiska
   // (edycja tekstu) albo przycisk usuwania, żeby te akcje nie przełączały zwinięcia.
@@ -405,6 +433,18 @@ function odejmijDzien(dataYmd) {
 function formatujDatePl(dataYmd) {
   const [r, m, d] = dataYmd.split('-');
   return d + '.' + m + '.' + r;
+}
+
+// wartoscPoczatkuAktualnejFormy(historiaFormy) -> 'RRRR-MM-DD' | '' - data, od
+// której obowiązuje OSTATNI (czyli aktualny) segment historii, do pola "Od kiedy"
+// widocznego bezpośrednio przy "Forma"/"Etat" (nie trzeba rozwijać Historii, żeby
+// to zobaczyć) - Piotr 2026-09-06: "powinno być od kiedy umowa i do kiedy".
+// Sentinel '2000-01-01' (stare dane sprzed wymuszenia obowiązkowej daty) traktujemy
+// jak brak daty - pole zostaje puste zamiast pokazywać fałszywy rok 2000.
+function wartoscPoczatkuAktualnejFormy(historiaFormy) {
+  if (!historiaFormy || !historiaFormy.length) return '';
+  const ostatni = historiaFormy[historiaFormy.length - 1];
+  return ostatni.obowiazujeOd && ostatni.obowiazujeOd !== '2000-01-01' ? ostatni.obowiazujeOd : '';
 }
 
 // ============================================================================
@@ -447,6 +487,9 @@ function synchronizujAktualneZHistorii(karta) {
   karta.querySelector('.p-etat').value = ostatni.etat == null ? 1 : ostatni.etat;
   karta.querySelector('.p-godz-min').value = ostatni.zlecenieMinGodzin == null ? '' : ostatni.zlecenieMinGodzin;
   karta.querySelector('.p-godz-max').value = ostatni.zlecenieMaxGodzin == null ? '' : ostatni.zlecenieMaxGodzin;
+  const poleOd = karta.querySelector('.p-forma-od');
+  poleOd.value = wartoscPoczatkuAktualnejFormy(historia);
+  poleOd.disabled = false;
 }
 
 // Odwrotny kierunek: pola na kafelku zostały zmienione ręcznie -> jeśli historia już
