@@ -315,8 +315,12 @@ function wierszPracownika(p, pokazPolaMain, rozwiniety) {
     '</div>' +
     '<div class="pk-historia-formy"></div>' +
     '<div class="pk-pola">' +
-      '<label>Grupa<select class="p-grupa"><option value="main"' + (p.grupa === 'main' ? ' selected' : '') + '>main</option>' +
-        '<option value="opie"' + (p.grupa === 'opie' ? ' selected' : '') + '>opie</option></select></label>' +
+      // Etykiety opcji ZMIENIONE 2026-09-06 na prośbę Piotra ("w grupie zmień
+      // nazewnictwo z main na pielęgniarki/ratownicy oraz opie na opiekunowie")
+      // - to TYLKO kosmetyka wyświetlania, wartości value="main"/"opie" zostają
+      // bez zmian (używane wszędzie indziej w appce jako klucz grupy).
+      '<label>Grupa<select class="p-grupa"><option value="main"' + (p.grupa === 'main' ? ' selected' : '') + '>pielęgniarki/ratownicy</option>' +
+        '<option value="opie"' + (p.grupa === 'opie' ? ' selected' : '') + '>opiekunowie</option></select></label>' +
       '<label>Stanowisko<select class="p-stanowisko">' + opcjeStanowiska(p.grupa, p.stanowisko) + '</select></label>' +
       // SW/Op - jednostka rocznego limitu (2 dni LUB 16 godz.) - dotyczy tylko etatu
       // (wytyczne_grafik_oddzialowa.docx pkt 3: "Wytyczne obejmują personel etatowy").
