@@ -292,11 +292,14 @@ function wierszPracownika(p, pokazPolaMain) {
       '<input type="text" class="p-nazwa pk-nazwa" value="' + (p.imieNazwisko || '').replace(/"/g, '&quot;') + '" placeholder="Imię i nazwisko">' +
       '<button type="button" class="icon-btn btn-usun-p" title="Usuń"><i class="ti ti-trash"></i></button>' +
     '</div>' +
+    '<div class="pk-forma-info" style="font-size:.8em;color:#777;"></div>' +
     '<div class="pk-pola">' +
-      '<label>Forma<select class="p-forma"><option value="etat"' + (p.forma === 'etat' ? ' selected' : '') + '>etat</option>' +
+      '<label>Forma<span class="pk-forma-wrap"><select class="p-forma"><option value="etat"' + (p.forma === 'etat' ? ' selected' : '') + '>etat</option>' +
         '<option value="kontrakt"' + (p.forma === 'kontrakt' ? ' selected' : '') + '>kontrakt</option>' +
-        '<option value="zlecenie"' + (p.forma === 'zlecenie' ? ' selected' : '') + '>zlecenie</option></select></label>' +
+        '<option value="zlecenie"' + (p.forma === 'zlecenie' ? ' selected' : '') + '>zlecenie</option></select>' +
+        '<button type="button" class="p-forma-historia-btn" title="Zmiana formy zatrudnienia W TRAKCIE zatrudnienia (np. zlecenie → etat) z zachowaniem poprawnego rozliczenia miesięcy SPRZED zmiany">⏱ od daty…</button></span></label>' +
       '<label>Etat<input type="number" class="p-etat" value="' + (p.etat == null ? 1 : p.etat) + '" min="0" max="1" step="0.05"' + (p.forma !== 'etat' ? ' disabled' : '') + '></label>' +
+      '<label>Zakończenie<input type="date" class="p-data-zakonczenia" value="' + (p.dataZakonczenia || '') + '" title="Ostatni dzień zatrudnienia - po tej dacie osoba znika z generatora grafiku (nie z Kadry ani z wcześniej zapisanego grafiku)"></label>' +
       '<label>Grupa<select class="p-grupa"><option value="main"' + (p.grupa === 'main' ? ' selected' : '') + '>main</option>' +
         '<option value="opie"' + (p.grupa === 'opie' ? ' selected' : '') + '>opie</option></select></label>' +
       '<label>Stanowisko<select class="p-stanowisko">' + opcjeStanowiska(p.grupa, p.stanowisko) + '</select></label>' +
@@ -326,6 +329,12 @@ function wierszPracownika(p, pokazPolaMain) {
           '<label class="pk-flaga"><input type="checkbox" class="p-dyzur-doba"' + (typyDyzuru.indexOf('doba') !== -1 ? ' checked' : '') + '> Doba</label>') +
     '</div>';
   karta.dataset.id = p.id || '';
+  // historiaFormy - NIE jest osobnym widocznym polem formularza (nie ma sensownej
+  // reprezentacji jako pojedynczy input) - trzymana jako JSON w dataset, edytowana
+  // WYŁĄCZNIE przez przycisk "⏱ od daty…" (patrz niżej) i przekazywana bez zmian do
+  // zapisu przy "Zapisz listę pracowników". Patrz grfPracownikNaDzien w domain/grafik.js.
+  karta.dataset.historiaFormy = JSON.stringify(p.historiaFormy || []);
+  renderInfoHistoriaFormy(karta);
   karta.querySelector('.btn-usun-p').addEventListener('click', () => karta.remove());
   karta.querySelector('.p-nazwa').addEventListener('input', (ev) => {
     karta.querySelector('.pk-avatar').textContent = inicjaly(ev.target.value);
@@ -348,7 +357,96 @@ function wierszPracownika(p, pokazPolaMain) {
     karta.querySelector('.p-sw-jednostka').disabled = !jestEtat;
     karta.querySelector('.p-op-jednostka').disabled = !jestEtat;
   });
+  karta.querySelector('.p-forma-historia-btn').addEventListener('click', () => zmienFormeOdDaty(karta));
   return karta;
+}
+
+// zmienFormeOdDaty(karta) - dopisane 2026-09-06 na prośbę Piotra: "czasami dochodzi
+// zmiana formy zatrudnienia (...) powinno być możliwość zmiany z zachowaniem
+// wcześniejszego [rozliczenia] na okres w który było dane zatrudnienie". Zapisuje
+// DOTYCHCZASOWE wartości pól (Forma/Etat/Godz. min/max) jako segment historyczny
+// (patrz pracownik.historiaFormy w domain/grafik.js, grfPracownikNaDzien), a
+// następnie prosi o NOWE wartości i ustawia je jako aktualne (widoczne w kafelku) -
+// od podanej daty wsteczne miesiące nadal liczą się wg starej formy, od tej daty
+// (włącznie) wg nowej. Prosty przepływ przez prompt() (jak reszta appki - patrz
+// confirm() przy generatorze/publikacji) - NIE pozwala edytować/kasować już
+// zapisanych segmentów historii (ograniczenie znane, zaakceptowane jako v1: appka
+// dziś realnie potrzebuje obsłużyć jedną zmianę formy na osobę, nie pełen edytor).
+function zmienFormeOdDaty(karta) {
+  const poleForma = karta.querySelector('.p-forma');
+  const poleEtat = karta.querySelector('.p-etat');
+  const poleMin = karta.querySelector('.p-godz-min');
+  const poleMax = karta.querySelector('.p-godz-max');
+
+  const dzisiaj = new Date().toISOString().slice(0, 10);
+  const dataZmiany = prompt(
+    'Od jakiej daty obowiązuje NOWA forma zatrudnienia?\n' +
+    '(miesiące SPRZED tej daty policzą się dalej wg DOTYCHCZASOWEJ formy: ' + poleForma.value + ')\n\n' +
+    'Format: RRRR-MM-DD', dzisiaj);
+  if (dataZmiany == null) return; // anulowano
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dataZmiany)) { alert('Nieprawidłowy format daty. Użyj RRRR-MM-DD.'); return; }
+
+  const nowaForma = (prompt('Nowa forma zatrudnienia od ' + dataZmiany + ':\netat / kontrakt / zlecenie', poleForma.value) || '').trim().toLowerCase();
+  if (['etat', 'kontrakt', 'zlecenie'].indexOf(nowaForma) === -1) { alert('Nieprawidłowa forma. Wpisz dokładnie: etat, kontrakt albo zlecenie.'); return; }
+
+  // Zabezpiecz DOTYCHCZASOWE wartości jako segment historyczny - TYLKO jeśli to
+  // PIERWSZA zmiana (historia jeszcze pusta). Jeśli historia już ma segmenty, to
+  // ostatni z nich JUŻ odpowiada aktualnym (widocznym) polom - patrz komentarz
+  // "top-level mirrors latest" przy grfPracownikNaDzien - więc nic nie trzeba
+  // dodatkowo zabezpieczać, tylko dopisać NOWY segment niżej. Sentinel
+  // "obowiązuje od 2000-01-01" przy pierwszym segmencie oznacza po prostu
+  // "obowiązywała od zawsze/od początku danych appki" (appka realnie działa od
+  // 2026 r., więc to bezpieczna, odległa data-sentinel).
+  let historia;
+  try { historia = JSON.parse(karta.dataset.historiaFormy || '[]'); } catch (e) { historia = []; }
+  if (!historia.length) {
+    historia.push({
+      forma: poleForma.value,
+      etat: poleForma.value === 'etat' ? (Number(poleEtat.value) || 1) : undefined,
+      zlecenieMinGodzin: poleMin.value !== '' ? Number(poleMin.value) : undefined,
+      zlecenieMaxGodzin: poleMax.value !== '' ? Number(poleMax.value) : undefined,
+      obowiazujeOd: '2000-01-01',
+    });
+  }
+  const ostatniaObowiazujeOd = historia[historia.length - 1].obowiazujeOd;
+  if (dataZmiany <= ostatniaObowiazujeOd) {
+    alert('Data zmiany (' + dataZmiany + ') musi być PÓŹNIEJSZA niż data ostatniej zapisanej zmiany formy (' + ostatniaObowiazujeOd + '). Anulowano.');
+    return;
+  }
+
+  let nowyEtat, nowyMin, nowyMax;
+  if (nowaForma === 'etat') {
+    nowyEtat = Number(prompt('Nowy wymiar etatu (0-1):', '1')) || 1;
+    nowyMin = undefined; nowyMax = undefined;
+  } else {
+    nowyEtat = 1;
+    const wpisMin = prompt('Nowe "Godz. min" (puste = brak):', '');
+    const wpisMax = prompt('Nowe "Godz. max" (puste = brak):', '');
+    nowyMin = wpisMin !== null && wpisMin !== '' ? Number(wpisMin) : undefined;
+    nowyMax = wpisMax !== null && wpisMax !== '' ? Number(wpisMax) : undefined;
+  }
+  historia.push({ forma: nowaForma, etat: nowyEtat, zlecenieMinGodzin: nowyMin, zlecenieMaxGodzin: nowyMax, obowiazujeOd: dataZmiany });
+
+  karta.dataset.historiaFormy = JSON.stringify(historia);
+
+  // Zaktualizuj WIDOCZNE pola na kafelku, żeby odzwierciedlały aktualną (najnowszą) formę.
+  poleForma.value = nowaForma;
+  poleForma.dispatchEvent(new Event('change'));
+  poleEtat.value = nowyEtat;
+  poleMin.value = nowyMin == null ? '' : nowyMin;
+  poleMax.value = nowyMax == null ? '' : nowyMax;
+
+  renderInfoHistoriaFormy(karta);
+  alert('Zapisano historię formy zatrudnienia (widoczne pola pokazują teraz formę aktualną). Kliknij „Zapisz listę pracowników", żeby to utrwalić.');
+}
+
+function renderInfoHistoriaFormy(karta) {
+  const info = karta.querySelector('.pk-forma-info');
+  if (!info) return;
+  let historia;
+  try { historia = JSON.parse(karta.dataset.historiaFormy || '[]'); } catch (e) { historia = []; }
+  if (!historia.length) { info.textContent = ''; return; }
+  info.textContent = 'Historia formy: ' + historia.map((h) => (h.obowiazujeOd === '2000-01-01' ? 'do zawsze' : 'od ' + h.obowiazujeOd) + ': ' + h.forma).join(' → ');
 }
 
 function renderTabelePracownikow() {
@@ -396,6 +494,9 @@ document.getElementById('btn-zapisz-pracownikow').addEventListener('click', asyn
     const godzMax = tr.querySelector('.p-godz-max').value;
     const swJednostka = tr.querySelector('.p-sw-jednostka').value;
     const opJednostka = tr.querySelector('.p-op-jednostka').value;
+    const dataZakonczenia = tr.querySelector('.p-data-zakonczenia').value;
+    let historiaFormy;
+    try { historiaFormy = JSON.parse(tr.dataset.historiaFormy || '[]'); } catch (e) { historiaFormy = []; }
     return {
       id: tr.dataset.id || ('p' + Date.now().toString(36) + i),
       imieNazwisko: tr.querySelector('.p-nazwa').value.trim(),
@@ -410,6 +511,10 @@ document.getElementById('btn-zapisz-pracownikow').addEventListener('click', asyn
       typyDyzuru: typyDyzuru.length ? typyDyzuru : undefined,
       silaWyzszaJednostka: swJednostka === 'godziny' ? 'godziny' : undefined,
       opiekaJednostka: opJednostka === 'godziny' ? 'godziny' : undefined,
+      // dataZakonczenia/historiaFormy - dopisane 2026-09-06, patrz domain/grafik.js
+      // (grfPracownikNaDzien, kandydaciNaDziure) i zmienFormeOdDaty()/renderInfoHistoriaFormy() wyżej.
+      dataZakonczenia: dataZakonczenia || undefined,
+      historiaFormy: historiaFormy.length ? historiaFormy : undefined,
     };
   }).filter((p) => p.imieNazwisko);
 
