@@ -562,6 +562,25 @@ function godzinyPracownika(wpisy, pracownikId, etat) {
 }
 
 /**
+ * godzinyDyzurowPracownika(wpisy, pracownikId) -> suma godzin WYŁĄCZNIE z dyżurów
+ * D/N/DOBA (kod EFEKTYWNY), BEZ żadnych nieobecności (UW/CH/urlopy itd.) ani szkoleń.
+ * W ODRÓŻNIENIU od godzinyPracownika() (która nieobecności liczy wg indywidualnej
+ * stawki osoby - poprawnie dla W5/wymiaru etatu, bo tam liczymy "ile miał do
+ * przepracowania po pomniejszeniu o nieobecność") - do W15 potrzebne są WYŁĄCZNIE
+ * godziny faktycznie przepracowanych dyżurów, bo umowa zlecenie/kontrakt określa
+ * godziny FAKTYCZNIE PRZEPRACOWANE, nie "wymiar pomniejszony o nieobecność" jak dla
+ * etatu. POPRAWKA 2026-09-06 (Jan, REGULY-ukladania-grafiku-SOR.md): appka wcześniej
+ * doliczała urlop/chorobowe jako godziny pracy B2B w W15, fałszując rozliczenie z
+ * umową - osoba z 36 h dyżurów i dwutygodniowym urlopem "miała" wg appki 111,8 h
+ * zamiast realnych 36 h, więc panel nie widział realnego niedoboru.
+ */
+function godzinyDyzurowPracownika(wpisy, pracownikId) {
+  return wpisy
+    .filter(function (w) { return w.pracownikId === pracownikId && grfJestZmiana(grfKodEfektywny(w)); })
+    .reduce(function (suma, w) { return suma + godzinyKodu(grfKodEfektywny(w), 1); }, 0);
+}
+
+/**
  * grfLiczbaDyzurowOsoby(wpisy, pracownikId) -> liczba SZTUK dyżurów roboczych
  * (D+N+DOBA, wg kodu EFEKTYWNEGO - patrz grfKodEfektywny) danej osoby w `wpisy`.
  * Do W18 (sprawiedliwy rozkład dyżurów) - w odróżnieniu od godzinyPracownika()
@@ -903,18 +922,38 @@ function ostrzezeniaMiesiaca(wpisy, pracownicy, rok, miesiac, parametry, wpisyRo
     if ((p.forma === 'zlecenie' || p.forma === 'kontrakt') && (typeof p.zlecenieMinGodzin === 'number' || typeof p.zlecenieMaxGodzin === 'number')) {
       var prefiksMiesiaca15 = rok + '-' + String(miesiac).padStart(2, '0');
       var wpisyMiesiaca15 = wpisy.filter(function (w) { return w.pracownikId === p.id && w.data.indexOf(prefiksMiesiaca15) === 0; });
-      var hMiesiaca15 = godzinyPracownika(wpisyMiesiaca15, p.id, grfWymiarEtatu(p));
+      // godzinyDyzurowPracownika (NIE godzinyPracownika) - patrz komentarz przy tej
+      // funkcji: umowa liczy godziny FAKTYCZNIE przepracowanych dyżurów, nie wymiar
+      // pomniejszony o urlop/chorobowe jak dla etatu.
+      var hMiesiaca15 = godzinyDyzurowPracownika(wpisyMiesiaca15, p.id);
       var etykietaMiesiaca15 = String(miesiac).padStart(2, '0') + '.' + rok;
+
+      // "Urlop" kontraktowy (formalnie: zwolnienie z udzielania świadczeń) - TYLKO
+      // forma 'kontrakt', NIE 'zlecenie' (Piotr potwierdził 2026-09-06: "pracownicy
+      // zleceniowi nie mają takiej opcji"). Liczony 8h/dzień (nie 7h35 jak etat, nie
+      // 12h jak dyżur), do 26 dni w roku (limit roczny NA RAZIE niepilnowany przez
+      // appkę - do zrobienia osobno). Każdy taki dzień (kod UW) obniża TYLKO dolny
+      // limit (minimum) z umowy o 8h - górny limit (max) zostaje bez zmian (Piotr
+      // potwierdził oba wybory). Bez tego appka fałszywie zgłaszała niedobór osobie,
+      // która była legalnie na zatwierdzonym urlopie.
+      var minGodzin15 = p.zlecenieMinGodzin;
+      var dniUrlopuKontrakt15 = 0;
+      if (p.forma === 'kontrakt' && typeof minGodzin15 === 'number') {
+        dniUrlopuKontrakt15 = wpisyMiesiaca15.filter(function (w) { return grfKodEfektywny(w) === 'UW'; }).length;
+        minGodzin15 = Math.max(0, minGodzin15 - dniUrlopuKontrakt15 * 8);
+      }
+
       if (typeof p.zlecenieMaxGodzin === 'number' && hMiesiaca15 > p.zlecenieMaxGodzin) {
         out.push({
           sev: 'soft', rule: 'W15', pracownikId: p.id, data: dataOf(1),
           komunikat: 'Przekroczony maksymalny zakres godzin miesiąca ' + etykietaMiesiaca15 + ': ' + grfHm(hMiesiaca15) + ' wobec max ' + grfHm(p.zlecenieMaxGodzin) + ' z umowy.',
         });
       }
-      if (typeof p.zlecenieMinGodzin === 'number' && hMiesiaca15 < p.zlecenieMinGodzin) {
+      if (typeof minGodzin15 === 'number' && hMiesiaca15 < minGodzin15) {
         out.push({
           sev: 'soft', rule: 'W15', pracownikId: p.id, data: dataOf(1),
-          komunikat: 'Niedobór do minimalnego zakresu godzin miesiąca ' + etykietaMiesiaca15 + ': ' + grfHm(hMiesiaca15) + ' wobec min ' + grfHm(p.zlecenieMinGodzin) + ' z umowy.',
+          komunikat: 'Niedobór do minimalnego zakresu godzin miesiąca ' + etykietaMiesiaca15 + ': ' + grfHm(hMiesiaca15) + ' wobec min ' + grfHm(minGodzin15) + ' z umowy' +
+            (dniUrlopuKontrakt15 ? ' (pomniejszone o ' + dniUrlopuKontrakt15 + ' dni urlopu × 8h z ' + grfHm(p.zlecenieMinGodzin) + ')' : '') + '.',
         });
       }
     }
@@ -1296,6 +1335,7 @@ if (typeof module !== 'undefined' && module.exports) {
     obsadaDnia: obsadaDnia,
     obsadaPielegniarekDnia: obsadaPielegniarekDnia,
     godzinyPracownika: godzinyPracownika,
+    godzinyDyzurowPracownika: godzinyDyzurowPracownika,
     grfLiczbaDyzurowOsoby: grfLiczbaDyzurowOsoby,
     wymiarMiesieczny: wymiarMiesieczny,
     wymiarOkresuRozliczeniowego: wymiarOkresuRozliczeniowego,
